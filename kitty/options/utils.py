@@ -1647,7 +1647,7 @@ JumpTypes = Literal['start', 'end', 'none', 'both']
 
 
 class EasingFunction(NamedTuple):
-    type: Literal['steps', 'linear', 'cubic-bezier', ''] = ''
+    type: Literal['steps', 'linear', 'cubic-bezier', 'spring', ''] = ''
 
     num_steps: int = 0
     jump_type: JumpTypes = 'end'
@@ -1656,6 +1656,12 @@ class EasingFunction(NamedTuple):
     linear_y: tuple[float, ...] = ()
 
     cubic_bezier_points: tuple[float, ...] = ()
+
+    # Damped spring (Material You motion): damping ratio and stiffness. A
+    # stiffness of zero means the spring is stretched to settle exactly at the
+    # end of the animation.
+    spring_damping: float = 0.
+    spring_stiffness: float = 0.
 
     def __repr__(self) -> str:
         fields = ', '.join(f'{f}={getattr(self, f)!r}' for f in self._fields if getattr(self, f) != self._field_defaults[f])
@@ -1738,6 +1744,83 @@ class EasingFunction(NamedTuple):
             n = max(1, int(parts[0]))
         return cls(type='steps', jump_type=jump_type, num_steps=n)
 
+    @classmethod
+    def spring(cls, params: str) -> 'EasingFunction':
+        parts = params.replace(',', ' ').split()
+        if not 1 <= len(parts) <= 2:
+            raise ValueError('spring easing function must have a damping ratio and an optional stiffness')
+        damping = float(parts[0])
+        if not 0.05 <= damping <= 10:
+            raise ValueError(f'spring damping ratio must be between 0.05 and 10, not {damping}')
+        stiffness = float(parts[1]) if len(parts) > 1 else 0.
+        if stiffness < 0:
+            raise ValueError(f'spring stiffness must not be negative, not {stiffness}')
+        return cls(type='spring', spring_damping=damping, spring_stiffness=stiffness)
+
+    @classmethod
+    def from_spec(cls, func_name: str, params: str) -> 'EasingFunction':
+        if func_name == 'cubic-bezier':
+            return cls.cubic_bezier(params)
+        if func_name == 'linear':
+            return cls.linear(params)
+        if func_name == 'steps':
+            return cls.steps(params)
+        if func_name == 'spring':
+            return cls.spring(params)
+        raise KeyError(f'{func_name} is not a valid easing function')
+
+
+def sample_material_emphasized_curve(num_samples: int = 24) -> str:
+    # The Material 3 emphasized easing is a two segment bezier path:
+    # M 0,0 C 0.05,0 0.133333,0.06 0.166666,0.4 C 0.208333,0.82 0.25,1 1,1
+    # which cannot be expressed as a single cubic-bezier(), so sample it as linear()
+    segments = (((0., 0.), (0.05, 0.), (0.133333, 0.06), (0.166666, 0.4)), ((0.166666, 0.4), (0.208333, 0.82), (0.25, 1.), (1., 1.)))
+
+    def point(seg: tuple[tuple[float, float], ...], t: float) -> tuple[float, float]:
+        mt = 1 - t
+        c = (mt * mt * mt, 3 * mt * mt * t, 3 * mt * t * t, t * t * t)
+        return sum(c[i] * seg[i][0] for i in range(4)), sum(c[i] * seg[i][1] for i in range(4))
+
+    pts: list[tuple[float, float]] = []
+    for seg in segments:
+        for i in range(num_samples + 1):
+            x, y = point(seg, i / num_samples)
+            if not pts or x > pts[-1][0] + 1e-4:
+                pts.append((x, y))
+    pts[-1] = (1., 1.)
+    return ', '.join(f'{y:.4f} {x * 100:.3f}%' for x, y in pts)
+
+
+# Material Design 3 motion tokens, see https://m3.material.io/styles/motion
+MATERIAL_EASING_CURVES: dict[str, tuple[str, str]] = {
+    'm3-standard': ('cubic-bezier', '0.2, 0, 0, 1'),
+    'm3-standard-decelerate': ('cubic-bezier', '0, 0, 0, 1'),
+    'm3-standard-accelerate': ('cubic-bezier', '0.3, 0, 1, 1'),
+    'm3-emphasized-decelerate': ('cubic-bezier', '0.05, 0.7, 0.1, 1'),
+    'm3-emphasized-accelerate': ('cubic-bezier', '0.3, 0, 0.8, 0.15'),
+    # Springs from the M3 Expressive motion schemes (damping ratio, stiffness),
+    # stretched over the duration of the animation.
+    'm3-spring': ('spring', '0.9'),
+    'm3-spring-bouncy': ('spring', '0.6'),
+    'm3-spring-effects': ('spring', '1'),
+    # The same springs with their natural physical timing
+    'm3-spring-fast': ('spring', '0.9, 1400'),
+    'm3-spring-default': ('spring', '0.9, 700'),
+    'm3-spring-slow': ('spring', '0.9, 300'),
+    'm3-expressive-fast': ('spring', '0.6, 800'),
+    'm3-expressive-default': ('spring', '0.8, 380'),
+    'm3-expressive-slow': ('spring', '0.8, 200'),
+    'm3-effects-fast': ('spring', '1, 3800'),
+    'm3-effects-default': ('spring', '1, 1600'),
+    'm3-effects-slow': ('spring', '1, 800'),
+}
+
+
+def material_easing_curve(name: str) -> tuple[str, str] | None:
+    if name == 'm3-emphasized':
+        return 'linear', sample_material_emphasized_curve()
+    return MATERIAL_EASING_CURVES.get(name)
+
 
 def parse_animation(spec: str, interval: float = -1.0) -> tuple[float, EasingFunction, EasingFunction]:
     with suppress(Exception):
@@ -1750,14 +1833,7 @@ def parse_animation(spec: str, interval: float = -1.0) -> tuple[float, EasingFun
         idx = 1 if m[0] else 0
         if m[idx]:
             raise ValueError(f'{spec} specified more than two easing functions')
-        if func_name == 'cubic-bezier':
-            m[idx] = EasingFunction.cubic_bezier(params)
-        elif func_name == 'linear':
-            m[idx] = EasingFunction.linear(params)
-        elif func_name == 'steps':
-            m[idx] = EasingFunction.steps(params)
-        else:
-            raise KeyError(f'{func_name} is not a valid easing function')
+        m[idx] = EasingFunction.from_spec(func_name, params)
 
     for match in re.finditer(r'([-+.0-9a-zA-Z]+)(?:\(([^)]*)\)){0,1}', spec):
         func_name, params = match.group(1, 2)
@@ -1781,6 +1857,8 @@ def parse_animation(spec: str, interval: float = -1.0) -> tuple[float, EasingFun
             parse_func('steps', '1, start')
         elif func_name == 'step-end':
             parse_func('steps', '1, end')
+        elif (mc := material_easing_curve(func_name)) is not None:
+            parse_func(*mc)
         else:
             raise KeyError(f'{func_name} is not a valid easing function')
     return interval, m[0], m[1]

@@ -22,6 +22,12 @@ static const double bezier_epsilon = 1e-7;
 static const unsigned max_newton_iterations = 4;
 static const unsigned max_bisection_iterations = 16;
 
+typedef struct SpringParameters {
+    // damping ratio, natural angular frequency (rad/s) and, for springs that
+    // are stretched to fit the animation duration, the settling time in units of 1/omega
+    double damping, omega, settle_time;
+} SpringParameters;
+
 typedef struct BezierParameters {
     double ax, bx, cx, ay, by, cy, start_gradient, end_gradient, spline_samples[11];
 } BezierParameters;
@@ -170,6 +176,45 @@ cubic_bezier_easing_curve(void *p_, double t, monotonic_t duration) {
 }
 // }}}
 
+// Damped spring {{{
+// Position of a unit mass on a spring released at 0 with zero velocity and
+// pulled towards 1, at time t (in units of 1/omega).
+static double
+spring_position(double damping, double t) {
+    if (damping < 1.0) {
+        double wd = sqrt(1.0 - damping * damping);
+        return 1.0 - exp(-damping * t) * (cos(wd * t) + (damping / wd) * sin(wd * t));
+    }
+    if (damping == 1.0) return 1.0 - exp(-t) * (1.0 + t);
+    double s = sqrt(damping * damping - 1.0), r1 = -damping + s, r2 = -damping - s;
+    return 1.0 - (r2 * exp(r1 * t) - r1 * exp(r2 * t)) / (r2 - r1);
+}
+
+static double
+spring_settle_time(double damping) {
+    static const double epsilon = 1e-3;
+    if (damping < 1.0) return -log(epsilon * sqrt(1.0 - damping * damping)) / damping;
+    // Critically and over damped springs approach 1 monotonically, so bisect
+    double lo = 0, hi = 1;
+    while (1.0 - spring_position(damping, hi) > epsilon && hi < 1e6) hi *= 2;
+    for (unsigned i = 0; i < 64; i++) {
+        double mid = (lo + hi) * 0.5;
+        if (1.0 - spring_position(damping, mid) > epsilon) lo = mid; else hi = mid;
+    }
+    return hi;
+}
+
+static double
+spring_easing_curve(void *p_, double t, monotonic_t duration) {
+    SpringParameters *p = p_;
+    if (t >= 1.0) return 1.0;
+    // Physical springs run on real time, stretched springs settle at the end of the animation
+    double x = p->settle_time > 0 ? t * p->settle_time : t * monotonic_t_to_s_double(duration) * p->omega;
+    return spring_position(p->damping, x);
+}
+
+// }}}
+
 static double
 step_easing_curve(void *p_, double t, monotonic_t duration UNUSED) {
     StepsParameters *p = p_;
@@ -199,14 +244,16 @@ animations_equal(const Animation *a, const Animation *b) {
             if (memcmp(pa->buf, pb->buf, 2 * pa->count * sizeof(double)) != 0) return false;
         } else if (fa->curve == step_easing_curve) {
             if (memcmp(fa->params, fb->params, sizeof(StepsParameters)) != 0) return false;
+        } else if (fa->curve == spring_easing_curve) {
+            if (memcmp(fa->params, fb->params, sizeof(SpringParameters)) != 0) return false;
         }
         // identity_easing_curve has no params; function-pointer equality above is sufficient
     }
     return true;
 }
 
-double
-apply_easing_curve(const Animation *a, double val, monotonic_t duration) {
+static double
+easing_curve_value(const Animation *a, double val, monotonic_t duration, bool clamp) {
     val = unit_value(val);
     if (!a->count) return val;
     size_t idx = MIN((size_t)(val * a->count), a->count - 1);
@@ -214,7 +261,19 @@ apply_easing_curve(const Animation *a, double val, monotonic_t duration) {
     double interval_size = 1. / a->count, interval_start = idx * interval_size;
     double scaled_val = (val - interval_start) / interval_size;
     double ans = f->curve(f->params, scaled_val, duration);
-    return f->y_at_start + unit_value(ans) * f->y_size;
+    return f->y_at_start + (clamp ? unit_value(ans) : ans) * f->y_size;
+}
+
+double
+apply_easing_curve(const Animation *a, double val, monotonic_t duration) {
+    return easing_curve_value(a, val, duration, true);
+}
+
+double
+apply_easing_curve_with_overshoot(const Animation *a, double val, monotonic_t duration) {
+    // springs and cubic-beziers with control points outside [0, 1] may
+    // overshoot their target, which is desirable for motion, not for opacity
+    return easing_curve_value(a, val, duration, false);
 }
 
 static animation_function *
@@ -271,6 +330,16 @@ add_cubic_bezier_animation(Animation *a, double y_at_start, double y_at_end, dou
     f->params = p;
 }
 
+void
+add_spring_animation(Animation *a, double y_at_start, double y_at_end, double damping, double stiffness) {
+    SpringParameters *p = calloc(1, sizeof(SpringParameters));
+    if (!p) fatal("Out of memory");
+    p->damping = MAX(0.01, damping);
+    if (stiffness > 0) p->omega = sqrt(stiffness);
+    else p->settle_time = spring_settle_time(p->damping);
+    animation_function *f = init_function(a, y_at_start, y_at_end, spring_easing_curve);
+    f->params = p;
+}
 void
 add_linear_animation(Animation *a, double y_at_start, double y_at_end, size_t count, const double *x, const double *y) {
     const size_t sz = count * sizeof(double);

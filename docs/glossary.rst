@@ -66,6 +66,29 @@ Glossary
       various animations in kitty, such as :opt:`cursor_blink_interval` and
       :opt:`visual_bell_duration`.
 
+      Kitty Material You adds Material Design 3 motion on top of the CSS
+      functions:
+
+      * :code:`spring(damping)` a damped spring stretched to settle exactly at
+        the end of the animation. A damping ratio below :code:`1` bounces
+        (overshoots the target), :code:`1` is critically damped and larger
+        values approach the target ever more slowly.
+      * :code:`spring(damping, stiffness)` the same spring with its natural,
+        physical timing, as in the M3 Expressive motion specification.
+      * The M3 easing tokens :code:`m3-standard`, :code:`m3-standard-decelerate`,
+        :code:`m3-standard-accelerate`, :code:`m3-emphasized`,
+        :code:`m3-emphasized-decelerate`, :code:`m3-emphasized-accelerate`.
+      * The M3 spring tokens :code:`m3-spring`, :code:`m3-spring-bouncy`,
+        :code:`m3-spring-effects` (stretched) and :code:`m3-spring-fast`,
+        :code:`m3-spring-default`, :code:`m3-spring-slow`,
+        :code:`m3-expressive-fast`, :code:`m3-expressive-default`,
+        :code:`m3-expressive-slow`, :code:`m3-effects-fast`,
+        :code:`m3-effects-default`, :code:`m3-effects-slow` (physical).
+
+      When an easing function controls opacity, overshoot is clamped. In
+      :doc:`custom shaders <custom-shaders>` the ``animation_progress`` of a
+      bouncy spring goes past :code:`1` before it settles.
+
    SIMD
       A programming technique that refers to having a single CPU instruction
       process multiple units of data, also called vector programming. Leads to

@@ -2863,7 +2863,7 @@ run_custom_end_shader(OSWindow *os_window, float sx, float sy, monotonic_t now) 
                 double t = elapsed / (double)eff_dur;
                 if (t < 0.0) t = 0.0;
                 if (t > 1.0) t = 1.0;
-                anim_progress = (float)(cg->animation_curve ? apply_easing_curve(cg->animation_curve, t, eff_dur) : t);
+                anim_progress = (float)(cg->animation_curve ? apply_easing_curve_with_overshoot(cg->animation_curve, t, eff_dur) : t);
                 anim_cache[num_anim_cached++] = (struct AnimCacheEntry){cg->animation_curve, started_at, eff_dur, anim_progress};
             }
         }

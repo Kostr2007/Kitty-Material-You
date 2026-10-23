@@ -44,6 +44,10 @@ add_easing_function(Animation *a, PyObject *e, double y_at_start, double y_at_en
         else if (EQ(jump_type, "none")) jt = EASING_STEP_NONE;
         else if (EQ(jump_type, "both")) jt = EASING_STEP_BOTH;
         add_steps_animation(a, y_at_start, y_at_end, PyLong_AsSize_t(num_steps), jt);
+    } else if (EQ(type, "spring")) {
+        G(spring_damping);
+        G(spring_stiffness);
+        add_spring_animation(a, y_at_start, y_at_end, PyFloat_AsDouble(spring_damping), PyFloat_AsDouble(spring_stiffness));
     }
 #undef EQ
 #undef D

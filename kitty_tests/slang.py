@@ -47,6 +47,22 @@ class TestSlang(BaseTest):
         self.ae(step(16), 16_000_000)
         self.assertRaises(ValueError, step, -1)
 
+    def test_animation_curve_parsing(self):
+        from kitty.options.utils import EasingFunction
+
+        def curve(val):
+            return parse_pipeline_definition(['startgroup', f'animation_curve {val}', 'shaders focus-highlight', 'endgroup'], 'test')['groups'][0][
+                'animation_curve'
+            ]
+
+        self.ae(curve('ease-out'), EasingFunction('cubic-bezier', cubic_bezier_points=(0, 0, 0.58, 1)))
+        self.ae(curve('spring(0.7)'), EasingFunction('spring', spring_damping=0.7))
+        self.ae(curve('m3-spring-bouncy'), EasingFunction('spring', spring_damping=0.6))
+        self.ae(curve('m3-emphasized-decelerate'), EasingFunction('cubic-bezier', cubic_bezier_points=(0.05, 0.7, 0.1, 1)))
+        self.ae(curve('m3-emphasized').type, 'linear')
+        self.assertRaises(ValueError, curve, 'spring(0)')
+        self.assertRaises(ValueError, curve, 'bouncy-castle')
+
     def test_custom_shader_redraw_logic(self):
         from kitty.fast_data_types import custom_shader_needs_render, simulate_custom_shader_render_ticks
 

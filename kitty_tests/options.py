@@ -541,6 +541,41 @@ def conf_parsing(self):
     ef('steps(4, jump-both)', {0: 0.2, 0.1: 0.2, 0.3: 0.4, 0.9: 1})
     ef('steps(6, jump-none)', {0: 0, 0.1: 0.0, 0.3: 0.2, 0.9: 1})
 
+    # Material You springs and motion tokens
+    cb('spring(0.6)', first=EasingFunction('spring', spring_damping=0.6))
+    cb('0.4 spring(0.9, 700) m3-spring-effects', 0.4, EasingFunction('spring', spring_damping=0.9, spring_stiffness=700),
+       EasingFunction('spring', spring_damping=1))
+    cb('m3-standard', first=EasingFunction('cubic-bezier', cubic_bezier_points=(0.2, 0, 0, 1)))
+    cb('m3-expressive-fast', first=EasingFunction('spring', spring_damping=0.6, spring_stiffness=800))
+    self.ae(p('cursor_blink_interval m3-emphasized').cursor_blink_interval[1].type, 'linear')
+    p('cursor_blink_interval spring(0)', bad_line_num=1)
+    p('cursor_blink_interval spring(0.5, -3)', bad_line_num=1)
+
+    def spring(damping, t):
+        import math
+        if damping < 1:
+            wd = math.sqrt(1 - damping * damping)
+            return 1 - math.exp(-damping * t) * (math.cos(wd * t) + damping / wd * math.sin(wd * t))
+        return 1 - math.exp(-t) * (1 + t)
+
+    def spring_samples(spec, duration=0.5):
+        self.set_options({'cursor_blink_interval': p('cursor_blink_interval ' + spec).cursor_blink_interval})
+        return [test_cursor_blink_easing_function(i / 100, True, duration) for i in range(101)]
+
+    for spec in ('spring(1)', 'spring(2.5)', 'm3-spring-effects'):
+        vals = spring_samples(spec)
+        self.ae((vals[0], vals[-1]), (0, 1))
+        self.assertTrue(all(b >= a - 1e-9 for a, b in zip(vals, vals[1:])), f'{spec} is not monotonic')
+        self.assertGreater(vals[50], 0.9, spec)
+    vals = spring_samples('m3-spring-bouncy')
+    self.ae((vals[0], vals[-1]), (0, 1))
+    self.assertGreater(max(vals), 1.05, 'a bouncy spring must overshoot')
+    self.assertLess(abs(vals[99] - 1), 0.01, 'a stretched spring must settle at the end of the animation')
+    # physical springs run on real time: x(t * duration * sqrt(stiffness))
+    ef('spring(0.6, 400)', {t: spring(0.6, t * 0.5 * 20) for t in (0, 0.05, 0.1, 0.2, 0.5)}, accuracy=1e-6)
+    ef('spring(1, 100)', {t: spring(1, t * 0.5 * 10) for t in (0, 0.1, 0.3, 0.6)}, accuracy=1e-6)
+    ef('m3-emphasized', {0: 0, 1: 1, 0.166666: 0.4}, accuracy=0.02)
+
     # test various include modes
     base = os.path.join(self.tdir, 'glob')
     os.mkdir(base)

@@ -58,7 +58,7 @@ from kitty.fast_data_types import (
     get_options,
 )
 from kitty.options.types import Options, defaults
-from kitty.options.utils import EasingFunction
+from kitty.options.utils import EasingFunction, material_easing_curve
 from kitty.types import run_once
 from kitty.utils import lock_with_file, log_error, resolve_custom_file
 
@@ -1199,17 +1199,16 @@ def parse_css_animation_curve(spec: str) -> EasingFunction:
     }
 
     def make(func_name: str, params: str) -> EasingFunction:
-        if func_name == 'cubic-bezier':
-            return EasingFunction.cubic_bezier(params)
-        if func_name == 'linear':
-            return EasingFunction.linear(params)
-        if func_name == 'steps':
-            return EasingFunction.steps(params)
-        raise ValueError(f'{func_name!r} is not a valid easing function type')
+        try:
+            return EasingFunction.from_spec(func_name, params)
+        except KeyError:
+            raise ValueError(f'{func_name!r} is not a valid easing function type')
 
     spec = spec.strip()
     if spec in _NAMED:
         return make(*_NAMED[spec])
+    if (mc := material_easing_curve(spec)) is not None:
+        return make(*mc)
     m = re.match(r'^([-a-zA-Z]+)\(([^)]+)\)$', spec)
     if m:
         return make(m.group(1), m.group(2))
