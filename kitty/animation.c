@@ -48,6 +48,7 @@ typedef struct Animation {
 
 
 #include "animation.h"
+#include "animation-parse.h"
 #include "state.h"
 
 Animation *
@@ -395,8 +396,22 @@ test_cursor_blink_easing_function(PyObject *self UNUSED, PyObject *args) {
     return PyFloat_FromDouble(apply_easing_curve(a, t, duration));
 }
 
+static PyObject *
+evaluate_easing_function(PyObject *self UNUSED, PyObject *args) {
+    PyObject *easing_function;
+    double t, duration_s;
+    if (!PyArg_ParseTuple(args, "Odd", &easing_function, &t, &duration_s)) return NULL;
+    Animation *a = alloc_animation();
+    if (!a) return PyErr_NoMemory();
+    add_easing_function(a, easing_function, 0, 1);
+    double ans = animation_is_valid(a) ? apply_easing_curve_with_overshoot(a, t, s_double_to_monotonic_t(duration_s)) : unit_value(t);
+    free_animation(a);
+    if (PyErr_Occurred()) return NULL;
+    return PyFloat_FromDouble(ans);
+}
+
 static PyMethodDef module_methods[] = {
-    METHODB(test_cursor_blink_easing_function, METH_VARARGS), {NULL, NULL, 0, NULL} /* Sentinel */
+    METHODB(test_cursor_blink_easing_function, METH_VARARGS), METHODB(evaluate_easing_function, METH_VARARGS), {NULL, NULL, 0, NULL} /* Sentinel */
 };
 
 

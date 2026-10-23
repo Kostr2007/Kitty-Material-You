@@ -10,7 +10,7 @@ from kitty.conf.utils import (
 from kitty.options.utils import (
     action_alias, active_tab_title_template, allow_hyperlinks, background_images, bell_on_tab,
     box_drawing_scale, clear_all_mouse_actions, clear_all_shortcuts, clipboard_control,
-    clone_source_strategies, config_or_absolute_path, confirm_close, copy_on_select,
+    clone_source_strategies, color_transition, config_or_absolute_path, confirm_close, copy_on_select,
     cursor_blink_interval, cursor_corner_radius, cursor_text_color, cursor_trail_decay,
     cursor_trail_spring, cursor_trail_start_threshold, custom_shaders, deprecated_adjust_line_height,
     deprecated_hide_window_decorations_aliases, deprecated_macos_show_window_title_in_menubar_alias,
@@ -913,6 +913,9 @@ class Parser:
 
     def color255(self, val: str, ans: dict[str, typing.Any]) -> None:
         ans['color255'] = to_color_or_none(val)
+
+    def color_transition(self, val: str, ans: dict[str, typing.Any]) -> None:
+        ans['color_transition'] = color_transition(val)
 
     def command_on_bell(self, val: str, ans: dict[str, typing.Any]) -> None:
         ans['command_on_bell'] = to_cmdline(val)

@@ -279,11 +279,17 @@ def patch_colors(
     windows: Sequence[WindowType] | None = None,
     notify_on_bg_change: bool = True,
     background_image_options: BackgroundImageOptions | None = None,
+    animate: bool = True,
 ) -> None:
     boss = get_boss()
     opts = get_options()
     if windows is None:
         windows = tuple(boss.all_windows)
+    if animate:
+        from .color_transition import start_color_transition
+
+        if start_color_transition(spec, transparent_background_colors, configured, windows, notify_on_bg_change, background_image_options):
+            return
     bg_colors_before = {w.id: w.screen.color_profile.default_bg for w in windows}
     profiles = tuple(w.screen.color_profile for w in windows if w)
     patch_color_profiles(spec, transparent_background_colors, profiles, configured)

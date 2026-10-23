@@ -8,6 +8,7 @@ from kitty.fonts.render import FontObject
 from kitty.marks import MarkerFunc
 from kitty.notifications import MacOSNotificationCategory
 from kitty.options.types import Options
+from kitty.options.utils import EasingFunction
 from kitty.simple_cli_definitions import OptionDefinition
 from kitty.types import LayerShellConfig, SignalInfo
 from kitty.typing_compat import EdgeLiteral, NotRequired, ReadableBuffer, WriteableBuffer
@@ -520,6 +521,7 @@ def coretext_all_fonts(monospaced_only: bool) -> Tuple[CoreTextFont, ...]:
 class ParsedFontFeature:
     def __init__(self, s: str): ...
 
+def evaluate_easing_function(easing_function: EasingFunction, t: float, duration: float) -> float: ...
 def add_timer(callback: Callable[[Optional[int]], None], interval: float, repeats: bool = True) -> int:
     pass
 

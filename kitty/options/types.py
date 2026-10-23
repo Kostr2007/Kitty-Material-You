@@ -334,6 +334,7 @@ option_names = (
     'color253',
     'color254',
     'color255',
+    'color_transition',
     'command_on_bell',
     'confirm_os_window_close',
     'copy_on_select',
@@ -564,6 +565,7 @@ class Options:
     clipboard_max_size: float = 512.0
     clone_source_strategies: frozenset[str] = frozenset({'conda', 'env_var', 'path', 'venv'})
     close_on_child_death: bool = False
+    color_transition: tuple[float, kitty.options.utils.EasingFunction, kitty.options.utils.EasingFunction] = (0.0, kitty.options.utils.EasingFunction(), kitty.options.utils.EasingFunction())
     command_on_bell: list[str] = ['none']
     confirm_os_window_close: tuple[int, bool] = (-1, False)
     copy_on_select: str = ''

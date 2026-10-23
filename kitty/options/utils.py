@@ -1885,6 +1885,13 @@ def parse_animation(spec: str, interval: float = -1.0) -> tuple[float, EasingFun
     return interval, m[0], m[1]
 
 
+def color_transition(spec: str) -> tuple[float, EasingFunction, EasingFunction]:
+    duration, first, second = parse_animation(spec, interval=0.0)
+    if duration < 0:
+        raise ValueError(f'color_transition duration must not be negative, not: {duration}')
+    return duration, first, second
+
+
 def cursor_blink_interval(spec: str) -> tuple[float, EasingFunction, EasingFunction]:
     return parse_animation(spec)
 

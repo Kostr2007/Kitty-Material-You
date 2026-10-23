@@ -2554,6 +2554,23 @@ opt(
 )
 
 opt(
+    'color_transition',
+    '0',
+    option_type='color_transition',
+    long_text="""
+Smoothly morph between color schemes, the Material You way. When colors are
+changed with :ref:`kitten @ set-colors <at-set-colors>` (used by tools such as
+:code:`myt` from Material-You-Terminal to re-theme running terminals from the
+wallpaper) or by switching between light and dark :ref:`automatic themes
+<auto_color_scheme>`, the colors of all affected windows, the tab bar and the
+borders transition over the specified number of seconds, interpolated in the
+perceptually uniform OKLab color space. Optionally followed by an
+:term:`easing function`, for example: :code:`0.45 m3-emphasized-decelerate` or
+:code:`0.6 m3-spring-effects`. Zero disables the transition.
+""",
+)
+
+opt(
     'background_opacity',
     '1.0',
     option_type='unit_float',
