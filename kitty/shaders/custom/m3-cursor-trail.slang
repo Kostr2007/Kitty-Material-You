@@ -31,8 +31,10 @@ quad_sdf(float2 p, float2 v0, float2 v1, float2 v2, float2 v3) {
         float2 w = p - v[i];
         float2 b = w - e * clamp(dot(w, e) / max(dot(e, e), 1e-6), 0.0, 1.0);
         d = min(d, dot(b, b));
-        bool3 c = bool3(p.y >= v[i].y, p.y < v[j].y, e.x * w.y > e.y * w.x);
-        if (all(c) || all(!c)) s = -s;
+        bool above = p.y >= v[i].y;
+        bool below = v[j].y > p.y;
+        bool left = (e.x * w.y - e.y * w.x) > 0.0;
+        if ((above && below && left) || (!above && !below && !left)) s = -s;
     }
     return s * sqrt(d);
 }
