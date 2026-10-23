@@ -1,0 +1,48 @@
+{
+  "nodes": {
+    "material-you-terminal": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1792740573,
+        "narHash": "sha256-pN9uACtdSQvrAnJOSO6XhZxOVu3zr+5qr8lDutI7wlg=",
+        "ref": "refs/heads/main",
+        "rev": "9be1c2460bd7bf7e2848c2b74d44e288d68ccc1a",
+        "revCount": 2,
+        "type": "git",
+        "url": "https://github.com/Kostr2007/Material-You-Terminal"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://github.com/Kostr2007/Material-You-Terminal"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1792502884,
+        "narHash": "sha256-IoNisKcGbUjdd45qCqywGMCYmZ5EnkxezvLII0FWwNA=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "02c087f3fe673c9e317f206a627cb6b910336dbe",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "material-you-terminal": "material-you-terminal",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

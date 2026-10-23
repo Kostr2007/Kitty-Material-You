@@ -1,0 +1,8 @@
+brew "zlib"
+brew "xxhash"
+brew "simde"
+brew "python"
+brew "imagemagick"
+brew "harfbuzz"
+brew "sphinx-doc"
+brew "go"
