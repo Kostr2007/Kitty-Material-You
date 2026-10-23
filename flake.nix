@@ -24,13 +24,17 @@
         in
         lib.concatStringsSep "." (builtins.match re line);
 
-      # Everything except the Nix packaging, so editing nix/ does not rebuild kitty.
+      # Everything except the Nix packaging and the files kitty does not need,
+      # so editing those does not rebuild kitty.
       src = lib.fileset.toSource {
         root = ./.;
         fileset = lib.fileset.difference ./. (lib.fileset.unions [
           ./nix
           ./flake.nix
-          (lib.fileset.maybeMissing ./flake.lock)
+          ./flake.lock
+          ./extras
+          ./README.md
+          ./docs/material-you
           (lib.fileset.maybeMissing ./result)
         ]);
       };
