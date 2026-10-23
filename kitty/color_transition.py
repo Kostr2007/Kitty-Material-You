@@ -73,8 +73,8 @@ class ColorTransition:
 
     def __init__(
         self,
-        groups: Sequence[tuple[tuple['WindowType', ...], 'ColorsSpec']],
-        target: 'ColorsSpec',
+        groups: Sequence[tuple[tuple['WindowType', ...], dict[str, int]]],
+        target: dict[str, int],
         duration: float,
         easing: EasingFunction,
         apply_frame: Callable[[tuple['WindowType', ...], 'ColorsSpec'], None],
@@ -109,7 +109,7 @@ class ColorTransition:
             return
         t = self.progress(elapsed)
         for windows, start in self.groups:
-            self.apply_frame(windows, {k: mix_colors(v, self.target[k], t) for k, v in start.items()})  # type: ignore[arg-type]
+            self.apply_frame(windows, {k: mix_colors(v, self.target[k], t) for k, v in start.items()})
 
     def stop(self, apply_final: bool = False, except_keys: frozenset[str] = frozenset()) -> None:
         if self.done:
@@ -173,7 +173,7 @@ def start_color_transition(
         return False
     from .colors import patch_colors
 
-    target: ColorsSpec = {k: spec[k] for k in keys}
+    target = {k: v for k in keys if isinstance(v := spec[k], int)}
     gstart = global_start_colors(keys)
     groups: dict[tuple[tuple[str, int], ...], list[WindowType]] = {}
     for w in windows:
