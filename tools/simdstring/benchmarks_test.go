@@ -1,0 +1,108 @@
+// License: GPLv3 Copyright: 2024, Kovid Goyal, <kovid at kovidgoyal.net>
+
+package simdstring
+
+import (
+	"bytes"
+	"fmt"
+	"testing"
+)
+
+var _ = fmt.Print
+
+func haystack(filler, needle byte, pos int) []byte {
+	var data []byte
+	if pos > 0 {
+		data = append(bytes.Repeat([]byte{filler}, pos-1), needle)
+	} else {
+		data = []byte{needle}
+	}
+	return data
+}
+
+var sizes = []int{6, 327, 9875, 1198673}
+
+func BenchmarkIndexByte(b *testing.B) {
+	t := func(pos int, which string) {
+		data := haystack('a', 'q', pos)
+		f := IndexByte
+		switch which {
+		case "scalar":
+			f = index_byte_scalar
+		case "stdlib":
+			f = bytes.IndexByte
+		}
+		b.Run(fmt.Sprintf("%s_sz=%d", which, pos), func(b *testing.B) {
+			for b.Loop() {
+				f(data, 'q')
+			}
+		})
+	}
+	for _, pos := range sizes {
+		t(pos, "simdstring")
+		t(pos, "scalar")
+		t(pos, "stdlib")
+	}
+}
+
+func BenchmarkIndexByte2(b *testing.B) {
+	t := func(pos int, which string) {
+		data := haystack('a', 'q', pos)
+		f := IndexByte2
+		switch which {
+		case "scalar":
+			f = index_byte2_scalar
+		}
+		b.Run(fmt.Sprintf("%s_sz=%d", which, pos), func(b *testing.B) {
+			for b.Loop() {
+				f(data, 'q', 'x')
+			}
+		})
+	}
+	for _, pos := range sizes {
+		t(pos, "simdstring")
+		t(pos, "scalar")
+	}
+}
+
+func BenchmarkNotIndexByte(b *testing.B) {
+	t := func(pos int, which string) {
+		// Fill with 'a' and place 'q' (a non-matching byte) at the target position
+		data := haystack('a', 'q', pos)
+		f := NotIndexByte
+		switch which {
+		case "scalar":
+			f = not_index_byte_scalar
+		}
+		b.Run(fmt.Sprintf("%s_sz=%d", which, pos), func(b *testing.B) {
+			for b.Loop() {
+				f(data, 'a')
+			}
+		})
+	}
+	for _, pos := range sizes {
+		t(pos, "simdstring")
+		t(pos, "scalar")
+	}
+}
+
+func BenchmarkNotIndexByte2(b *testing.B) {
+	t := func(pos int, which string) {
+		// Fill with 'a' and place 'q' (neither 'a' nor 'x') at the target position
+		data := haystack('a', 'q', pos)
+		f := NotIndexByte2
+		switch which {
+		case "scalar":
+			f = not_index_byte2_scalar
+		}
+		b.Run(fmt.Sprintf("%s_sz=%d", which, pos), func(b *testing.B) {
+			for b.Loop() {
+				f(data, 'a', 'x')
+			}
+		})
+	}
+	for _, pos := range sizes {
+		t(pos, "simdstring")
+		t(pos, "scalar")
+	}
+}

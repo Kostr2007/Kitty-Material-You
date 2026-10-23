@@ -1,0 +1,7 @@
+sphinx
+furo
+sphinx-copybutton
+sphinxext-opengraph
+sphinx-design
+sphinx-autobuild
+matplotlib

@@ -1,0 +1,377 @@
+#!/usr/bin/env python
+# vim:fileencoding=utf-8
+# License: GPLv3 Copyright: 2020, Kovid Goyal <kovid at kovidgoyal.net>
+
+import glob
+import io
+import json
+import lzma
+import os
+import platform
+import shlex
+import shutil
+import subprocess
+import sys
+import tarfile
+import time
+from urllib.request import Request, urlopen
+
+BUNDLE_URL = 'https://download.calibre-ebook.com/ci/kitty/{}-64.tar.xz'
+FONTS_URL = 'https://download.calibre-ebook.com/ci/fonts.tar.xz'
+NERD_URL = 'https://github.com/ryanoasis/nerd-fonts/releases/latest/download/NerdFontsSymbolsOnly.tar.xz'
+is_bundle = os.environ.get('KITTY_BUNDLE') == '1'
+is_codeql = os.environ.get('KITTY_CODEQL') == '1'
+is_macos = 'darwin' in sys.platform.lower()
+running_under_sanitizer = os.environ.get('KITTY_SANITIZE') == '1'
+SW = ''
+SLANG_INSTALL_DIR = '/tmp/slang'
+
+
+def do_print_crash_reports() -> None:
+    sys.stdout.flush()
+    sys.stderr.flush()
+    time.sleep(2)
+    print('Printing available crash reports...')
+    if is_macos:
+        end_time = time.monotonic() + 90
+        while time.monotonic() < end_time:
+            time.sleep(1)
+            items = glob.glob(os.path.join(os.path.expanduser('~/Library/Logs/DiagnosticReports'), 'kitty-*.ips'))
+            if items:
+                break
+        if items:
+            time.sleep(1)
+            print(os.path.basename(items[0]))
+            sdir = os.path.dirname(os.path.abspath(__file__))
+            subprocess.check_call([sys.executable, os.path.join(sdir, 'macos_crash_report.py'), items[0]])
+    else:
+        run('sh -c "echo bt | coredumpctl debug"')
+    print(flush=True)
+
+
+def run(*a: str, print_crash_reports: bool = False) -> None:
+    if len(a) == 1:
+        a = tuple(shlex.split(a[0]))
+    cmd = ' '.join(map(shlex.quote, a))
+    print(cmd)
+    sys.stdout.flush()
+    ret = subprocess.Popen(a).wait()
+    if ret != 0:
+        if ret < 0:
+            import signal
+
+            try:
+                sig = signal.Signals(-ret)
+            except ValueError:
+                pass
+            else:
+                if print_crash_reports:
+                    do_print_crash_reports()
+                raise SystemExit(f'The following process was killed by signal: {sig.name}:\n{cmd}')
+        raise SystemExit(f'The following process failed with exit code: {ret}:\n{cmd}')
+
+
+def download_with_retry(url: str | Request, count: int = 5) -> bytes:
+    for i in range(count):
+        try:
+            print('Downloading', getattr(url, 'full_url', url), flush=True)
+            with urlopen(url) as f:
+                ans: bytes = f.read()
+            return ans
+        except Exception as err:
+            if getattr(err, 'code', -1) == 403:
+                raise
+            if i >= count - 1:
+                raise
+            print(f'Download failed with error {err} retrying...', file=sys.stderr)
+            time.sleep(1)
+    return b''
+
+
+def install_fonts() -> None:
+    data = download_with_retry(FONTS_URL)
+    fonts_dir = os.path.expanduser('~/Library/Fonts' if is_macos else '~/.local/share/fonts')
+    os.makedirs(fonts_dir, exist_ok=True)
+    with tarfile.open(fileobj=io.BytesIO(data), mode='r:xz') as tf:
+        try:
+            tf.extractall(fonts_dir, filter='fully_trusted')
+        except TypeError:
+            tf.extractall(fonts_dir)
+    data = download_with_retry(NERD_URL)
+    with tarfile.open(fileobj=io.BytesIO(data), mode='r:xz') as tf:
+        try:
+            tf.extractall(fonts_dir, filter='fully_trusted')
+        except TypeError:
+            tf.extractall(fonts_dir)
+
+
+def install_slang_compiler() -> None:
+    os_name = 'macos' if is_macos else 'linux'
+    machine = platform.machine().lower()
+    arch = 'aarch64' if machine in ('aarch64', 'arm64') else 'x86_64'
+
+    with open('bypy/sources.json') as f:
+        data = json.loads(f.read())
+    for dep in data:
+        if dep['name'].startswith('slang '):
+            version = dep['name'].split()[-1]
+            break
+    url = f'https://github.com/shader-slang/slang/releases/download/v{version}/slang-{version}-{os_name}-{arch}.tar.gz'
+    install_dir = SLANG_INSTALL_DIR
+    os.makedirs(install_dir, exist_ok=True)
+    data = download_with_retry(url)
+    with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as tf:
+        try:
+            tf.extractall(install_dir, filter='fully_trusted')
+        except TypeError:
+            # filter parameter not supported on older Python versions
+            tf.extractall(install_dir)
+
+    pc_dir = os.path.join(install_dir, 'lib', 'pkgconfig')
+    pp = os.environ.get('PKG_CONFIG_PATH', '')
+    os.environ['PKG_CONFIG_PATH'] = f'{pc_dir}:{pp}' if pp else pc_dir
+
+
+def install_deps() -> None:
+    print('Installing kitty dependencies...')
+    sys.stdout.flush()
+    if is_macos:
+        if not is_codeql:  # for some reason brew fails on CodeQL we dont need it anyway
+            items = [x.split()[1].strip('"') for x in open('Brewfile').readlines() if x.strip().startswith('brew ')]
+            openssl = 'openssl'
+            items.remove('go')  # already installed by ci.yml
+            import ssl
+
+            if ssl.OPENSSL_VERSION_INFO[0] == 1:
+                openssl += '@1.1'
+            run('brew', 'install', 'fish', openssl, *items)
+    else:
+        run('sudo apt-get update')
+        run(
+            'sudo apt-get install -y --fix-missing libgl1-mesa-dev libxi-dev libxrandr-dev libxinerama-dev ca-certificates'
+            ' libxcursor-dev libxcb-xkb-dev libdbus-1-dev libxkbcommon-dev libharfbuzz-dev libx11-xcb-dev zsh'
+            ' libpng-dev liblcms2-dev libfontconfig-dev libxkbcommon-x11-dev libcanberra-dev libxxhash-dev uuid-dev'
+            ' libsimde-dev libsystemd-dev libcairo2-dev zsh bash dash systemd-coredump gdb'
+            ' libwayland-dev wayland-protocols glslang-tools'
+        )
+        # for some reason these directories are world writable which causes zsh
+        # compinit to break
+        run('sudo chmod -R og-w /usr/share/zsh')
+    if is_bundle:
+        install_bundle()
+    else:
+        cmd = 'python3 -m pip install Pillow pygments'
+        if sys.version_info[:2] < (3, 7):
+            cmd += ' importlib-resources dataclasses'
+        run(cmd)
+        install_slang_compiler()
+    install_fonts()
+
+
+def set_slangc() -> None:
+    slangc = os.path.join(SW if is_bundle else SLANG_INSTALL_DIR, 'bin', 'slangc')
+    os.environ['SLANGC'] = slangc
+
+
+def build_kitty() -> None:
+    python = shutil.which('python3') if is_bundle else sys.executable
+    cmd = f'{python} setup.py build --verbose'
+    if running_under_sanitizer:
+        cmd += ' --debug --sanitize'
+    set_slangc()
+    run(cmd)
+
+
+def test_kitty() -> None:
+    if is_macos:
+        run('ulimit -c unlimited')
+        run('sudo chmod -R 777 /cores')
+        if running_under_sanitizer:
+            os.environ['MallocNanoZone'] = '0'
+    set_slangc()
+    run('./test.py', print_crash_reports=True)
+
+
+def package_kitty() -> None:
+    set_slangc()
+    python = 'python3' if is_macos else 'python'
+    run(f'{python} setup.py linux-package --update-check-interval=0 --verbose')
+    run('make FAIL_WARN=1 docs')
+    if is_macos:
+        run('python3 setup.py kitty.app --update-check-interval=0 --verbose')
+        run('kitty.app/Contents/MacOS/kitty +runpy "from kitty.constants import *; print(kitty_exe())"')
+
+
+def replace_in_file(path: str, src: str, dest: str) -> None:
+    with open(path, 'r+') as f:
+        n = f.read().replace(src, dest)
+        f.seek(0), f.truncate()
+        f.write(n)
+
+
+def setup_bundle_env() -> None:
+    global SW
+    os.environ['SW'] = SW = '/Users/Shared/kitty-build/sw/sw' if is_macos else os.path.join(os.environ['GITHUB_WORKSPACE'], 'sw')
+    os.environ['PKG_CONFIG_PATH'] = os.path.join(SW, 'lib', 'pkgconfig')
+    if is_macos:
+        os.environ['PATH'] = '{}:{}'.format('/usr/local/opt/sphinx-doc/bin', os.environ['PATH'])
+    else:
+        os.environ['LD_LIBRARY_PATH'] = os.path.join(SW, 'lib')
+        os.environ['PYTHONHOME'] = SW
+    os.environ['PATH'] = '{}:{}'.format(os.path.join(SW, 'bin'), os.environ['PATH'])
+
+
+def install_bundle(dest: str = '', which: str = '') -> None:
+    dest = dest or SW
+    cwd = os.getcwd()
+    os.makedirs(dest, exist_ok=True)
+    os.chdir(dest)
+    which = which or ('macos' if is_macos else 'linux')
+    data = download_with_retry(BUNDLE_URL.format(which))
+    with tarfile.open(fileobj=io.BytesIO(data), mode='r:xz') as tf:
+        try:
+            tf.extractall(filter='fully_trusted')
+        except TypeError:
+            tf.extractall()
+    if not is_macos:
+        replaced = 0
+        for dirpath, dirnames, filenames in os.walk('.'):
+            for f in filenames:
+                if f.endswith('.pc') or (f.endswith('.py') and f.startswith('_sysconfig')):
+                    replace_in_file(os.path.join(dirpath, f), '/sw/sw', dest)
+                    replaced += 1
+        if replaced < 2:
+            raise SystemExit('Failed to replace path to SW in bundle')
+    os.chdir(cwd)
+
+
+def install_grype(exe: str = '/tmp/grype') -> str:
+    raw = download_with_retry('https://download.calibre-ebook.com/ci/grype.xz')
+    raw = lzma.decompress(raw)
+    with open(exe, 'wb') as f:
+        f.write(raw)
+        os.fchmod(f.fileno(), 0o755)
+    subprocess.check_call([exe, 'db', 'update'])
+    return exe
+
+
+IGNORED_DEPENDENCY_CVES = [
+    # Python stdlib
+    'CVE-2025-8194',  # DoS in tarfile
+    'CVE-2025-6069',  # DoS in HTMLParser
+    'CVE-2025-13836',  # DoS in http client reading from malicious server
+    'CVE-2025-12084',  # DoS in xml.dom.minidom unused in kitty
+    'CVE-2025-13837',  # DoS in plistlib reading plist. We only use plistlib for writing
+    'CVE-2025-6075',  # Quadratic complexity in os.path.expandvars()
+    # python stdlib all these are erroneously marked as fixed in python 3.15
+    # when it hasnt even been released. Sigh.
+    'CVE-2026-1299',
+    'CVE-2026-0865',
+    'CVE-2025-15282',
+    'CVE-2026-0672',
+    'CVE-2025-15366',
+    'CVE-2025-15367',
+    'CVE-2025-12781',
+    'CVE-2025-11468',
+    'CVE-2026-2297',
+    'CVE-2026-3644',
+    'CVE-2026-4224',
+    'CVE-2026-4519',
+    'CVE-2026-1502',
+    'CVE-2026-7210',  # DoS in unused XML parser
+    'CVE-2026-3276',  # DoS in unicodedata.normalize()
+    'CVE-2026-7774',  # tarfile.data_filter path traversal bypass
+    'CVE-2026-12003',  # bug in release builds irrelevant to us
+    'CVE-2026-15308',  # bug in stdlib html parser irrelevant to us
+    'CVE-2026-11940',  # tarfile, unused
+    'CVE-2026-11972',  # tarfile, unused
+    'CVE-2026-0864',  # configparser unused
+    'CVE-2026-17084',  # idna encoding, unused
+    'CVE-2026-15806',  # HTTPPasswordMgr unused
+    'CVE-2026-15310',  # DoS in unzip
+    # github.com/nwaples/rardecode/v2
+    'CVE-2025-11579',  # rardecode is version 2.2.1, not vulnerable
+    'CVE-2026-2673',  # openssl fix not released
+    'CVE-2026-14456',  # openssl fix not released
+]
+
+
+def check_dependencies() -> None:
+    grype = install_grype()
+    with open((gc := os.path.expanduser('~/.grype.yml')), 'w') as f:
+        print('ignore:', file=f)
+        for x in IGNORED_DEPENDENCY_CVES:
+            print('  - vulnerability:', x, file=f)
+    dest = os.path.join(SW, 'linux')
+    os.makedirs(dest, exist_ok=True)
+    install_bundle(dest, os.path.basename(dest))
+    dest = os.path.join(SW, 'macos')
+    os.makedirs(dest, exist_ok=True)
+    install_bundle(dest, os.path.basename(dest))
+    cmdline = [grype, '--by-cve', '--config', gc, '--fail-on', 'medium', '--only-fixed', '--add-cpes-if-none']
+    if (subprocess.run(cmdline + ['dir:' + SW])).returncode != 0:
+        raise SystemExit('grype found problems during filesystem scan')
+    # Now test against the SBOM
+    import runpy
+
+    orig = sys.argv, sys.stdout
+    sys.argv = ['bypy', 'sbom', 'kovidgoyal/kitty', '1.0.0']
+    buf = io.StringIO()
+    sys.stdout = buf
+    runpy.run_path('bypy-src')
+    sys.argv, sys.stdout = orig
+    print(buf.getvalue())
+    if (subprocess.run(cmdline, input=buf.getvalue().encode())).returncode != 0:
+        raise SystemExit('grype found problems during SBOM scan')
+
+
+def main() -> None:
+    if is_bundle:
+        setup_bundle_env()
+    else:
+        if not is_macos and 'pythonLocation' in os.environ:
+            os.environ['LD_LIBRARY_PATH'] = os.path.join(os.environ['pythonLocation'], 'lib')
+    action = sys.argv[-1]
+    if action in ('build', 'package'):
+        install_deps()
+    if action == 'build':
+        build_kitty()
+    elif action == 'package':
+        build_kitty()
+        test_kitty()
+        package_kitty()
+    elif action == 'test':
+        test_kitty()
+    elif action == 'govulncheck':
+        subprocess.check_call(['go', 'install', 'golang.org/x/vuln/cmd/govulncheck@latest'])
+        subprocess.check_call(['govulncheck', '-mode=binary', 'kitty/launcher/kitten'])
+        subprocess.check_call(['govulncheck', './...'])
+    elif action == 'check_code_formatting':
+        q = subprocess.check_output('gofmt -s -l tools kittens'.split()).decode()
+        if q.strip():
+            q = '\n'.join(filter(lambda x: not x.rstrip().endswith(('_generated.go', '_generated_test.go')), q.strip().splitlines())).strip()
+            if q:
+                raise SystemExit(q)
+        if subprocess.run(['ruff', 'format', '--check']).returncode != 0:
+            raise SystemExit('Some Python files are not formatted correctly')
+        c_files = subprocess.check_output(['git', 'ls-files', '*.c', '*.h', '*.m']).decode().split()
+        if c_files and subprocess.run(['clang-format', '--dry-run', '--Werror'] + c_files).returncode != 0:
+            raise SystemExit('Some C/ObjC files are not formatted correctly')
+        slang_files = subprocess.check_output(['git', 'ls-files', '*.slang']).decode().split()
+        badly_formatted_slang = []
+        for sf in slang_files:
+            assume_name = os.path.basename(sf) + '.cs'
+            with open(sf, 'rb') as f:
+                result = subprocess.run(['clang-format', '--style=file:.clang-format-for-slang', '--Werror', '-n', f'--assume-filename={assume_name}'], stdin=f)
+            if result.returncode != 0:
+                badly_formatted_slang.append(sf)
+        if badly_formatted_slang:
+            raise SystemExit('Some .slang files are not formatted correctly:\n' + '\n'.join(badly_formatted_slang))
+    elif action == 'check-dependencies':
+        check_dependencies()
+    else:
+        raise SystemExit(f'Unknown action: {action}')
+
+
+if __name__ == '__main__':
+    main()
