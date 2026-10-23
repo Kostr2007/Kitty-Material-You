@@ -1,0 +1,8 @@
+# Material You focus indicator on window focus change, see m3-focus.slang
+startgroup
+    animation_start window-focus-in
+    animation_stop 900
+    animation_curve linear
+    animation_step 16
+    shaders m3-focus
+endgroup

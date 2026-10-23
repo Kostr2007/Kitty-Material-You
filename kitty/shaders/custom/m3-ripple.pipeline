@@ -1,0 +1,8 @@
+# Material You touch ripple on left click, see m3-ripple.slang
+startgroup
+    animation_start pointer-left-button-press
+    animation_stop 650
+    animation_curve linear
+    animation_step 16
+    shaders m3-ripple
+endgroup

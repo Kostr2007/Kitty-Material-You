@@ -59,6 +59,39 @@ Retro Terminals
 
 .. include:: generated/custom-shaders-retro.rst
 
+Material You
+---------------
+
+Kitty Material You ships shaders that follow the Material Design 3 motion and
+state layer guidelines. They take their color from the cursor color, which is
+the primary color of a Material You color scheme, so they follow your palette
+(and your wallpaper, if the palette is generated from it). Enable all of them
+with::
+
+    custom_shaders material-you
+    cursor_trail 1
+    cursor_trail_spring m3-expressive-fast
+
+or pick individual ones:
+
+``m3-cursor-trail``
+    Draws the cursor trail as a soft, rounded blob that thins out towards its
+    tail. Together with :opt:`cursor_trail_spring` it stretches and wobbles
+    like jelly as it chases the cursor.
+
+``m3-ripple``
+    A touch ripple: clicking spreads a 12% state layer from the click across
+    the window with emphasized decelerate motion, then fades it away.
+
+``m3-focus``
+    A focus indicator: when you switch windows, a rounded outline springs into
+    place around the newly focused window with a little bounce, while the other
+    windows briefly recede.
+
+Like all shaders, their parameters (opacities, radii, spring damping, ...) are
+declared at the top of the shader files and can be tuned with ``var``
+directives in a pipeline file, see below.
+
 Customising and composing shaders
 -----------------------------------
 

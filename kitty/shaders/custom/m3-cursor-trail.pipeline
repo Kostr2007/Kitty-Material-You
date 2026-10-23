@@ -1,0 +1,7 @@
+# Material You cursor trail, see m3-cursor-trail.slang
+startgroup
+    animation_start cursor-trail-move
+    animation_stop cursor-trail-stop
+    animation_step 16
+    shaders m3-cursor-trail
+endgroup

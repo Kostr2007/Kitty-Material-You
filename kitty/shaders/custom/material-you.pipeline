@@ -1,0 +1,29 @@
+# All the Material You effects of Kitty Material You in one pipeline:
+#  - a jelly like rounded cursor trail (enable cursor_trail and, for the
+#    jelly motion, cursor_trail_spring in kitty.conf)
+#  - touch ripples when clicking
+#  - a springy focus indicator when switching windows
+# Use with: custom_shaders material-you
+
+startgroup
+    animation_start cursor-trail-move
+    animation_stop cursor-trail-stop
+    animation_step 16
+    shaders m3-cursor-trail
+endgroup
+
+startgroup
+    animation_start pointer-left-button-press
+    animation_stop 650
+    animation_curve linear
+    animation_step 16
+    shaders m3-ripple
+endgroup
+
+startgroup
+    animation_start window-focus-in
+    animation_stop 900
+    animation_curve linear
+    animation_step 16
+    shaders m3-focus
+endgroup
