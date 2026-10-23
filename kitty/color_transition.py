@@ -221,6 +221,6 @@ def start_color_transition(
             animate=False,
         )
 
-    current_transition = ColorTransition(final_groups, target, duration, easing, apply_frame, finish)
-    current_transition.start()
+    current_transition = ct = ColorTransition(final_groups, target, duration, easing, apply_frame, finish)
+    ct.start()
     return True
