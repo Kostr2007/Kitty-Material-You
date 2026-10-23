@@ -68,6 +68,7 @@ typedef struct Options {
     monotonic_t cursor_trail;
     float cursor_trail_decay_fast;
     float cursor_trail_decay_slow;
+    float cursor_trail_spring_stiffness, cursor_trail_spring_damping;
     color_type cursor_trail_color;
     int cursor_trail_start_threshold_x;
     int cursor_trail_start_threshold_y;
@@ -439,6 +440,8 @@ typedef struct CursorTrail {
     float opacity;
     float corner_x[4];
     float corner_y[4];
+    float velocity_x[4]; // corner velocities for the spring animation
+    float velocity_y[4];
     float previous_corner_x[4]; // corner_x as of the previous frame
     float previous_corner_y[4]; // corner_y as of the previous frame
     float cursor_edge_x[2];

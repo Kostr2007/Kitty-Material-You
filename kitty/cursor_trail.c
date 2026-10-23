@@ -71,6 +71,36 @@ should_skip_cursor_trail_update(CursorTrail *ct, ndc_coords g, OSWindow *os_wind
     return false;
 }
 
+// Advance a damped spring by dt seconds using the exact solution of the
+// spring equation, so it is stable for any frame time. d is the displacement
+// from the target and v the velocity.
+static void
+spring_step(float *d, float *v, double omega, double zeta, double dt) {
+    double d0 = *d, v0 = *v, dn, vn;
+    if (zeta < 1.0) {
+        double wd = omega * sqrt(1.0 - zeta * zeta), e = exp(-zeta * omega * dt), c = cos(wd * dt), s = sin(wd * dt);
+        double a = d0, b = (v0 + zeta * omega * d0) / wd;
+        dn = e * (a * c + b * s);
+        vn = e * ((b * wd - zeta * omega * a) * c - (a * wd + zeta * omega * b) * s);
+    } else if (zeta == 1.0) {
+        double e = exp(-omega * dt), b = v0 + omega * d0;
+        dn = e * (d0 + b * dt);
+        vn = e * (b - omega * (d0 + b * dt));
+    } else {
+        double q = omega * sqrt(zeta * zeta - 1.0), r1 = -zeta * omega + q, r2 = -zeta * omega - q;
+        double c1 = (v0 - r2 * d0) / (r1 - r2), c2 = d0 - c1, e1 = exp(r1 * dt), e2 = exp(r2 * dt);
+        dn = c1 * e1 + c2 * e2;
+        vn = c1 * r1 * e1 + c2 * r2 * e2;
+    }
+    *d = (float)dn;
+    *v = (float)vn;
+}
+
+static bool
+cursor_trail_uses_spring(void) {
+    return OPT(cursor_trail_spring_stiffness) > 0.f && OPT(cursor_trail_spring_damping) > 0.f;
+}
+
 static void
 update_cursor_trail_corners(CursorTrail *ct, ndc_coords g, monotonic_t now, OSWindow *os_window, Window *w) {
     // the trail corners move towards the cursor corner at a speed proportional to their distance from the cursor corner.
@@ -86,6 +116,7 @@ update_cursor_trail_corners(CursorTrail *ct, ndc_coords g, monotonic_t now, OSWi
         for (int i = 0; i < 4; ++i) {
             ct->corner_x[i] = EDGE(x, corner_index[0][i]);
             ct->corner_y[i] = EDGE(y, corner_index[1][i]);
+            ct->velocity_x[i] = ct->velocity_y[i] = 0.f;
         }
     } else if (ct->updated_at < now) {
         float cursor_center_x = (EDGE(x, 0) + EDGE(x, 1)) * 0.5f;
@@ -104,6 +135,7 @@ update_cursor_trail_corners(CursorTrail *ct, ndc_coords g, monotonic_t now, OSWi
             if (fabsf(dx[i]) < 1e-6 && fabsf(dy[i]) < 1e-6) {
                 dx[i] = dy[i] = 0.0f;
                 dot[i] = 0.0f;
+                if (fabsf(ct->velocity_x[i]) < 1e-6 && fabsf(ct->velocity_y[i]) < 1e-6) ct->velocity_x[i] = ct->velocity_y[i] = 0.0f;
                 continue;
             }
             dot[i] = (dx[i] * (EDGE(x, corner_index[0][i]) - cursor_center_x) + dy[i] * (EDGE(y, corner_index[1][i]) - cursor_center_y)) / cursor_diag_2 /
@@ -116,9 +148,21 @@ update_cursor_trail_corners(CursorTrail *ct, ndc_coords g, monotonic_t now, OSWi
         }
 
         for (int i = 0; i < 4; ++i) {
-            if ((dx[i] == 0 && dy[i] == 0) || min_dot == FLT_MAX) { continue; }
+            if ((dx[i] == 0 && dy[i] == 0 && ct->velocity_x[i] == 0 && ct->velocity_y[i] == 0) || min_dot == FLT_MAX) { continue; }
 
             float decay = (min_dot == max_dot) ? decay_slow : decay_slow + (decay_fast - decay_slow) * (dot[i] - min_dot) / (max_dot - min_dot);
+            if (cursor_trail_uses_spring()) {
+                // The leading corners use the configured spring, the trailing
+                // ones a softer spring, so that the trail stretches like jelly.
+                // The natural frequency scales inversely with the decay time.
+                double omega = sqrt(OPT(cursor_trail_spring_stiffness)) * decay_fast / decay;
+                float disp_x = -dx[i], disp_y = -dy[i];
+                spring_step(&disp_x, &ct->velocity_x[i], omega, OPT(cursor_trail_spring_damping), dt);
+                spring_step(&disp_y, &ct->velocity_y[i], omega, OPT(cursor_trail_spring_damping), dt);
+                ct->corner_x[i] = EDGE(x, corner_index[0][i]) + disp_x;
+                ct->corner_y[i] = EDGE(y, corner_index[1][i]) + disp_y;
+                continue;
+            }
             float step = 1.0f - exp2f(-10.0f * dt / decay);
             ct->corner_x[i] += dx[i] * step;
             ct->corner_y[i] += dy[i] * step;
@@ -151,10 +195,17 @@ update_cursor_trail_needs_render(CursorTrail *ct, Window *w, ndc_coords g) {
     for (int i = 0; i < 4; ++i) {
         float dx = fabsf(EDGE(x, corner_index[0][i]) - ct->corner_x[i]);
         float dy = fabsf(EDGE(y, corner_index[1][i]) - ct->corner_y[i]);
-        if (dx_threshold <= dx || dy_threshold <= dy) {
+        // a spring corner passing through the cursor may still overshoot it, so
+        // also look at where it will be in a tenth of a second
+        float vx = fabsf(ct->velocity_x[i]) * 0.1f, vy = fabsf(ct->velocity_y[i]) * 0.1f;
+        if (dx_threshold <= dx || dy_threshold <= dy || dx_threshold <= vx || dy_threshold <= vy) {
             ct->needs_render = true;
             break;
         }
+    }
+    if (!ct->needs_render) {
+        // settled, stop the spring so it does not drift on the next move
+        for (int i = 0; i < 4; ++i) ct->velocity_x[i] = ct->velocity_y[i] = 0.f;
     }
 }
 

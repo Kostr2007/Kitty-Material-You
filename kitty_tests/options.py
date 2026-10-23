@@ -555,6 +555,12 @@ def conf_parsing(self):
     p('cursor_blink_interval spring(0)', bad_line_num=1)
     p('cursor_blink_interval spring(0.5, -3)', bad_line_num=1)
 
+    self.ae(p('cursor_trail_spring none').cursor_trail_spring, (0, 0))
+    self.ae(p('cursor_trail_spring 700 0.7').cursor_trail_spring, (700, 0.7))
+    self.ae(p('cursor_trail_spring m3-expressive-fast').cursor_trail_spring, (800, 0.6))
+    p('cursor_trail_spring m3-spring-bouncy', bad_line_num=1)
+    p('cursor_trail_spring 700', bad_line_num=1)
+
     def spring(damping, t):
         import math
 

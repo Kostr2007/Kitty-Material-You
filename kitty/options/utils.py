@@ -670,6 +670,23 @@ def cursor_trail_decay(x: str) -> tuple[float, float]:
     return fast, slow
 
 
+def cursor_trail_spring(x: str) -> tuple[float, float]:
+    x = x.strip().lower()
+    if x in ('none', '0', ''):
+        return 0.0, 0.0
+    if (mc := MATERIAL_EASING_CURVES.get(x)) is not None and mc[0] == 'spring':
+        damping, stiffness = map(float, mc[1].split(','))
+        if stiffness > 0:
+            return stiffness, damping
+    parts = x.split()
+    if len(parts) != 2:
+        raise ValueError(f'cursor_trail_spring must be none, an M3 spring token or a stiffness and damping ratio, not: {x!r}')
+    stiffness, damping = positive_float(parts[0]), positive_float(parts[1])
+    if stiffness <= 0 or not 0.05 <= damping <= 10:
+        raise ValueError(f'cursor_trail_spring needs a positive stiffness and a damping ratio between 0.05 and 10, not: {x!r}')
+    return stiffness, damping
+
+
 def cursor_trail_start_threshold(x: str) -> tuple[int, int]:
     parts = x.split()
     if len(parts) == 1:

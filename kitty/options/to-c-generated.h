@@ -239,6 +239,19 @@ convert_from_opts_cursor_trail_decay(PyObject *py_opts, Options *opts) {
 }
 
 static void
+convert_from_python_cursor_trail_spring(PyObject *val, Options *opts) {
+    cursor_trail_spring(val, opts);
+}
+
+static void
+convert_from_opts_cursor_trail_spring(PyObject *py_opts, Options *opts) {
+    PyObject *ret = PyObject_GetAttrString(py_opts, "cursor_trail_spring");
+    if (ret == NULL) return;
+    convert_from_python_cursor_trail_spring(ret, opts);
+    Py_DECREF(ret);
+}
+
+static void
 convert_from_python_cursor_trail_start_threshold(PyObject *val, Options *opts) {
     cursor_trail_start_threshold(val, opts);
 }
@@ -1614,6 +1627,8 @@ convert_opts_from_python_opts(PyObject *py_opts, Options *opts) {
     convert_from_opts_cursor_trail(py_opts, opts);
     if (PyErr_Occurred()) return false;
     convert_from_opts_cursor_trail_decay(py_opts, opts);
+    if (PyErr_Occurred()) return false;
+    convert_from_opts_cursor_trail_spring(py_opts, opts);
     if (PyErr_Occurred()) return false;
     convert_from_opts_cursor_trail_start_threshold(py_opts, opts);
     if (PyErr_Occurred()) return false;

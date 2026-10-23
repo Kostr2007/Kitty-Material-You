@@ -481,6 +481,25 @@ Adjust these values to control how quickly the cursor trail fades away.
 )
 
 opt(
+    'cursor_trail_spring',
+    'none',
+    option_type='cursor_trail_spring',
+    ctype='!cursor_trail_spring',
+    long_text="""
+Make the cursor trail move like a Material You spring instead of decaying
+exponentially. The trail stretches and wobbles like jelly as it chases the
+cursor and can slightly overshoot it before settling. Specify the stiffness
+and damping ratio of the spring, for example: :code:`700 0.7`, or one of the
+M3 Expressive spring tokens: :code:`m3-spring-fast`, :code:`m3-spring-default`,
+:code:`m3-spring-slow`, :code:`m3-expressive-fast`, :code:`m3-expressive-default`,
+:code:`m3-expressive-slow`. Higher stiffness gives faster motion, a damping
+ratio below one gives more bounce. The corners at the back of the trail use a
+softer spring, scaled by the ratio of the two :opt:`cursor_trail_decay` times,
+so that the trail stretches. Set to :code:`none` to use the classic decay animation.
+""",
+)
+
+opt(
     'cursor_trail_start_threshold',
     '2',
     option_type='cursor_trail_start_threshold',

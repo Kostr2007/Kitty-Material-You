@@ -296,6 +296,12 @@ cursor_trail_decay(PyObject *src, Options *opts) {
 }
 
 static inline void
+cursor_trail_spring(PyObject *src, Options *opts) {
+    opts->cursor_trail_spring_stiffness = PyFloat_AsFloat(PyTuple_GET_ITEM(src, 0));
+    opts->cursor_trail_spring_damping = PyFloat_AsFloat(PyTuple_GET_ITEM(src, 1));
+}
+
+static inline void
 cursor_trail_start_threshold(PyObject *src, Options *opts) {
     opts->cursor_trail_start_threshold_x = (int)PyLong_AsLong(PyTuple_GET_ITEM(src, 0));
     opts->cursor_trail_start_threshold_y = (int)PyLong_AsLong(PyTuple_GET_ITEM(src, 1));
