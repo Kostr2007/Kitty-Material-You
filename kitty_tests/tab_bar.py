@@ -3,9 +3,20 @@
 
 from unittest.mock import patch
 
-from kitty.fast_data_types import LEFT_EDGE, Color, Region
+from kitty.fast_data_types import BOTTOM_EDGE, LEFT_EDGE, Color, Region
 from kitty.options.utils import tab_title_wrap
-from kitty.tab_bar import CellRange, TabBar, TabBarData, TabExtent, WindowDropTarget, as_rgb, powerline_symbols, truncate_line, wrap_title
+from kitty.tab_bar import (
+    CellRange,
+    TabBar,
+    TabBarData,
+    TabExtent,
+    WindowDropTarget,
+    as_rgb,
+    material_pill_caps,
+    powerline_symbols,
+    truncate_line,
+    wrap_title,
+)
 from kitty.utils import color_as_int
 
 from .base import BaseTest
@@ -216,6 +227,57 @@ class TestTabBar(BaseTest):
             tb.layout()
             tb.update(tuple(TabBarData(title=f't{i}', tab_id=i + 1, is_active=i == 0) for i in range(num_tabs)))
         return tb
+
+    def horizontal_tab_bar(self, titles: tuple[str, ...], width: int = 400, **opts: object) -> TabBar:
+        self.set_options({'tab_bar_edge': BOTTOM_EDGE, 'tab_title_template': '{title}', **opts})
+        central = region(0, 0, width, 180)
+        tab_bar = region(0, 180, width, 200)
+        with (
+            patch('kitty.tab_bar.cell_size_for_window', return_value=(10, 20)),
+            patch('kitty.tab_bar.viewport_for_window', return_value=(central, tab_bar, width, 200, 10, 20)),
+            patch('kitty.tab_bar.set_tab_bar_render_data'),
+            patch('kitty.tab_bar.get_boss', return_value=DummyBoss()),
+        ):
+            tb = TabBar(1)
+            tb.layout()
+            tb.update(tuple(TabBarData(title=t, tab_id=i + 1, is_active=i == 0) for i, t in enumerate(titles)))
+        return tb
+
+    def test_material_tab_bar_style(self) -> None:
+        colors = {
+            'active_tab_background': Color(200, 0, 0),
+            'inactive_tab_background': Color(0, 200, 0),
+            'tab_bar_background': Color(0, 0, 100),
+        }
+        active_bg, inactive_bg, bar_bg = (as_rgb(color_as_int(c)) for c in colors.values())
+        left, right = material_pill_caps
+        tb = self.horizontal_tab_bar(('one', 'two'), tab_bar_style='material', **colors)
+        line = tb.screen.line(0)
+        self.ae(str(line).rstrip(), f'{left} one {right} {left} two {right}')
+        for x, (fg, bg) in {
+            0: (active_bg, bar_bg),
+            2: (None, active_bg),
+            6: (active_bg, bar_bg),
+            7: (None, bar_bg),
+            8: (inactive_bg, bar_bg),
+            10: (None, inactive_bg),
+        }.items():
+            c = line.cursor_from(x)
+            if fg is not None:
+                self.ae(int(c.fg), fg, f'fg of column {x}')
+            self.ae(int(c.bg), bg, f'bg of column {x}')
+        self.ae(tuple(te.x.start for te in tb.tab_extents), (0, 8))
+
+        # long titles are truncated inside the pill
+        tb = self.horizontal_tab_bar(('a-very-long-tab-title', 'b'), width=200, tab_bar_style='material', **colors)
+        text = str(tb.screen.line(0)).rstrip()
+        self.assertIn(f'… {right}', text)
+        self.ae(text.count(left), 2)
+        self.ae(text.count(right), 2)
+
+        # vertical tab bars use round powerline tabs
+        tb = self.vertical_tab_bar(num_tabs=1, tab_bar_style='material')
+        self.ae(str(tb.screen.line(0))[-1], powerline_symbols['round'][0])
 
     def screen_lines(self, tb: TabBar) -> list[str]:
         s = tb.screen

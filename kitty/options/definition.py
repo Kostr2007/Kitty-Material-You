@@ -2210,7 +2210,7 @@ margin between the tab bar and the contents of the current tab.
 opt(
     'tab_bar_style',
     'fade',
-    choices=('fade', 'hidden', 'powerline', 'separator', 'slant', 'custom'),
+    choices=('fade', 'hidden', 'material', 'powerline', 'separator', 'slant', 'custom'),
     ctype='!tab_bar_style',
     long_text="""
 The tab bar style, can be one of:
@@ -2225,6 +2225,12 @@ The tab bar style, can be one of:
 :code:`powerline`
     Tabs are shown as a continuous line with "fancy" separators.
     (See also :opt:`tab_powerline_style`)
+:code:`material`
+    Material You: each tab is a separate pill shaped chip, the active tab is
+    filled with :opt:`active_tab_background`, the others with
+    :opt:`inactive_tab_background`, on the :opt:`tab_bar_background`. Needs a
+    font with the powerline round symbols, such as a Nerd Font, which kitty
+    bundles. Vertical tab bars use the round powerline style.
 :code:`custom`
     A user-supplied Python function called draw_tab is loaded from the file
     :file:`tab_bar.py` in the kitty config directory. For examples of how to

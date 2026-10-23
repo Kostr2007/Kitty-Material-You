@@ -592,6 +592,50 @@ def draw_tab_with_fade(
 powerline_symbols: dict[PowerlineStyle, tuple[str, str]] = {'slanted': ('', '╱'), 'round': ('', '')}
 
 
+material_pill_caps = ('\ue0b6', '\ue0b4')
+
+
+def draw_tab_with_material(
+    draw_data: DrawData, screen: Screen, tab: TabBarData, before: int, max_tab_length: int, index: int, is_last: bool, extra_data: ExtraData
+) -> int:
+    # Material You: every tab is a pill shaped chip floating on the tab bar,
+    # the active tab is filled with the active indicator color
+    if draw_data.tab_bar_edge in ('left', 'right'):
+        return draw_tab_with_powerline(draw_data._replace(powerline_style='round'), screen, tab, before, max_tab_length, index, is_last, extra_data)
+    tab_bg, tab_fg = screen.cursor.bg, screen.cursor.fg
+    bar_bg = as_rgb(color_as_int(draw_data.default_bg))
+    left_cap, right_cap = material_pill_caps
+
+    def draw_cap(symbol: str) -> None:
+        bold, italic = screen.cursor.bold, screen.cursor.italic
+        screen.cursor.bold = screen.cursor.italic = False
+        screen.cursor.fg, screen.cursor.bg = tab_bg, bar_bg
+        screen.draw(symbol)
+        screen.cursor.fg, screen.cursor.bg = tab_fg, tab_bg
+        screen.cursor.bold, screen.cursor.italic = bold, italic
+
+    draw_cap(left_cap)
+    if max_tab_length < 6:
+        screen.draw('…')
+    else:
+        screen.draw(' ')
+        draw_title(draw_data, screen, tab, index, max_tab_length)
+        screen.cursor.bg = tab_bg
+        # leave room for the trailing space and cap
+        limit = before + max_tab_length - 2
+        if screen.cursor.x > limit:
+            screen.cursor.x = limit - 1
+            screen.draw('…')
+        screen.draw(' ')
+    draw_cap(right_cap)
+    end = screen.cursor.x
+    screen.cursor.bold = screen.cursor.italic = False
+    screen.cursor.fg, screen.cursor.bg = 0, bar_bg
+    if not is_last and screen.cursor.x < screen.columns:
+        screen.draw(' ')  # the gap between chips
+    return end
+
+
 def draw_tab_with_powerline(
     draw_data: DrawData, screen: Screen, tab: TabBarData, before: int, max_tab_length: int, index: int, is_last: bool, extra_data: ExtraData
 ) -> int:
@@ -827,6 +871,8 @@ class TabBar:
             self.draw_func = draw_tab_with_powerline
         elif ts == 'slant':
             self.draw_func = draw_tab_with_slant
+        elif ts == 'material':
+            self.draw_func = draw_tab_with_material
         elif ts == 'custom':
             self.draw_func = load_custom_draw_tab()
         else:
