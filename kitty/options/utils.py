@@ -1660,8 +1660,8 @@ class EasingFunction(NamedTuple):
     # Damped spring (Material You motion): damping ratio and stiffness. A
     # stiffness of zero means the spring is stretched to settle exactly at the
     # end of the animation.
-    spring_damping: float = 0.
-    spring_stiffness: float = 0.
+    spring_damping: float = 0.0
+    spring_stiffness: float = 0.0
 
     def __repr__(self) -> str:
         fields = ', '.join(f'{f}={getattr(self, f)!r}' for f in self._fields if getattr(self, f) != self._field_defaults[f])
@@ -1752,7 +1752,7 @@ class EasingFunction(NamedTuple):
         damping = float(parts[0])
         if not 0.05 <= damping <= 10:
             raise ValueError(f'spring damping ratio must be between 0.05 and 10, not {damping}')
-        stiffness = float(parts[1]) if len(parts) > 1 else 0.
+        stiffness = float(parts[1]) if len(parts) > 1 else 0.0
         if stiffness < 0:
             raise ValueError(f'spring stiffness must not be negative, not {stiffness}')
         return cls(type='spring', spring_damping=damping, spring_stiffness=stiffness)
@@ -1774,7 +1774,7 @@ def sample_material_emphasized_curve(num_samples: int = 24) -> str:
     # The Material 3 emphasized easing is a two segment bezier path:
     # M 0,0 C 0.05,0 0.133333,0.06 0.166666,0.4 C 0.208333,0.82 0.25,1 1,1
     # which cannot be expressed as a single cubic-bezier(), so sample it as linear()
-    segments = (((0., 0.), (0.05, 0.), (0.133333, 0.06), (0.166666, 0.4)), ((0.166666, 0.4), (0.208333, 0.82), (0.25, 1.), (1., 1.)))
+    segments = (((0.0, 0.0), (0.05, 0.0), (0.133333, 0.06), (0.166666, 0.4)), ((0.166666, 0.4), (0.208333, 0.82), (0.25, 1.0), (1.0, 1.0)))
 
     def point(seg: tuple[tuple[float, float], ...], t: float) -> tuple[float, float]:
         mt = 1 - t
@@ -1787,7 +1787,7 @@ def sample_material_emphasized_curve(num_samples: int = 24) -> str:
             x, y = point(seg, i / num_samples)
             if not pts or x > pts[-1][0] + 1e-4:
                 pts.append((x, y))
-    pts[-1] = (1., 1.)
+    pts[-1] = (1.0, 1.0)
     return ', '.join(f'{y:.4f} {x * 100:.3f}%' for x, y in pts)
 
 

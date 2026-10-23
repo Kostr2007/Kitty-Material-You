@@ -199,7 +199,8 @@ spring_settle_time(double damping) {
     while (1.0 - spring_position(damping, hi) > epsilon && hi < 1e6) hi *= 2;
     for (unsigned i = 0; i < 64; i++) {
         double mid = (lo + hi) * 0.5;
-        if (1.0 - spring_position(damping, mid) > epsilon) lo = mid; else hi = mid;
+        if (1.0 - spring_position(damping, mid) > epsilon) lo = mid;
+        else hi = mid;
     }
     return hi;
 }

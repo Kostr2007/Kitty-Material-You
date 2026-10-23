@@ -543,8 +543,12 @@ def conf_parsing(self):
 
     # Material You springs and motion tokens
     cb('spring(0.6)', first=EasingFunction('spring', spring_damping=0.6))
-    cb('0.4 spring(0.9, 700) m3-spring-effects', 0.4, EasingFunction('spring', spring_damping=0.9, spring_stiffness=700),
-       EasingFunction('spring', spring_damping=1))
+    cb(
+        '0.4 spring(0.9, 700) m3-spring-effects',
+        0.4,
+        EasingFunction('spring', spring_damping=0.9, spring_stiffness=700),
+        EasingFunction('spring', spring_damping=1),
+    )
     cb('m3-standard', first=EasingFunction('cubic-bezier', cubic_bezier_points=(0.2, 0, 0, 1)))
     cb('m3-expressive-fast', first=EasingFunction('spring', spring_damping=0.6, spring_stiffness=800))
     self.ae(p('cursor_blink_interval m3-emphasized').cursor_blink_interval[1].type, 'linear')
@@ -553,6 +557,7 @@ def conf_parsing(self):
 
     def spring(damping, t):
         import math
+
         if damping < 1:
             wd = math.sqrt(1 - damping * damping)
             return 1 - math.exp(-damping * t) * (math.cos(wd * t) + damping / wd * math.sin(wd * t))
