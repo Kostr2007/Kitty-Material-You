@@ -352,6 +352,31 @@ class Rendering(FontBaseTest):
         test_render_line(line)
         self.assertEqual(len(self.sprites) - prerendered, len(box_chars))
 
+    def test_rounded_cursors(self):
+        from kitty.fast_data_types import render_decoration
+
+        w, h = 12, 20
+
+        def render(which, radius):
+            self.set_options({'cursor_corner_radius': radius, 'cursor_beam_thickness': 4, 'cursor_underline_thickness': 4})
+            b = render_decoration(which, w, h, 16, 2, 96.0)
+            return lambda x, y: b[y * w + x]
+
+        square = render('hollow_cursor', 0)
+        self.ae((square(0, 0), square(w - 1, h - 1), square(w // 2, h // 2)), (255, 255, 0))
+        rounded = render('hollow_cursor', 0.35)
+        # the corners are cut away, the middle of the edges is fully covered
+        self.ae((rounded(0, 0), rounded(w - 1, 0), rounded(0, h - 1), rounded(w - 1, h - 1)), (0, 0, 0, 0))
+        self.ae((rounded(w // 2, 0), rounded(0, h // 2), rounded(w // 2, h // 2)), (255, 255, 0))
+        # anti-aliased: partially covered pixels near the corners
+        self.assertTrue(any(0 < rounded(x, y) < 255 for x in range(3) for y in range(3)))
+        beam = render('beam_cursor', 0.35)
+        self.assertLess(beam(0, 0), 64)  # rounded end
+        self.ae((beam(1, h // 2), beam(w - 1, h // 2)), (255, 0))
+        underline = render('underline_cursor', 0.35)
+        self.assertLess(underline(0, h - 1), 64)
+        self.ae((underline(w // 2, h - 2), underline(w // 2, 0)), (255, 0))
+
     def test_scaled_box_drawing(self):
         self.scaled_drawing_test()
 

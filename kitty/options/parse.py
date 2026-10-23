@@ -11,8 +11,8 @@ from kitty.options.utils import (
     action_alias, active_tab_title_template, allow_hyperlinks, background_images, bell_on_tab,
     box_drawing_scale, clear_all_mouse_actions, clear_all_shortcuts, clipboard_control,
     clone_source_strategies, config_or_absolute_path, confirm_close, copy_on_select,
-    cursor_blink_interval, cursor_text_color, cursor_trail_decay, cursor_trail_spring,
-    cursor_trail_start_threshold, custom_shaders, deprecated_adjust_line_height,
+    cursor_blink_interval, cursor_corner_radius, cursor_text_color, cursor_trail_decay,
+    cursor_trail_spring, cursor_trail_start_threshold, custom_shaders, deprecated_adjust_line_height,
     deprecated_hide_window_decorations_aliases, deprecated_macos_show_window_title_in_menubar_alias,
     deprecated_scrollback_indicator_opacity, deprecated_send_text, disable_ligatures, edge_width, env,
     filter_notification, font_features, hide_window_decorations, macos_option_as_alt,
@@ -931,6 +931,9 @@ class Parser:
 
     def cursor_blink_interval(self, val: str, ans: dict[str, typing.Any]) -> None:
         ans['cursor_blink_interval'] = cursor_blink_interval(val)
+
+    def cursor_corner_radius(self, val: str, ans: dict[str, typing.Any]) -> None:
+        ans['cursor_corner_radius'] = cursor_corner_radius(val)
 
     def cursor_shape(self, val: str, ans: dict[str, typing.Any]) -> None:
         ans['cursor_shape'] = to_cursor_shape(val)

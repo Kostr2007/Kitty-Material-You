@@ -43,6 +43,11 @@ struct VertexOutput {
     float4 cursor_color_premult;
     float3 decoration_fg;
     float colored_sprite;
+    // Rounded block cursor: the text color outside the cursor, the fragment
+    // position relative to the cursor center and its half size, in pixels
+    float3 uncursored_foreground;
+    float4 cursor_rect_px;
+    nointerpolation float has_rounded_block_cursor;
 };
 
 // Foreground utility functions {{{
@@ -178,17 +183,23 @@ vertex_main(
         // Cursor
         vo.cursor_color_premult = float4(cell_data.cursor.bg * crd.cursor_opacity, crd.cursor_opacity);
         float3 final_cursor_text_color = lerp(foreground, cell_data.cursor.fg, crd.cursor_opacity);
-        foreground = if_one_then(cell_data.has_block_cursor, final_cursor_text_color, foreground);
-        vo.decoration_fg = if_one_then(cell_data.has_block_cursor, final_cursor_text_color, vo.decoration_fg);
+        vo.uncursored_foreground = foreground;
+        vo.has_rounded_block_cursor = cell_data.has_rounded_block_cursor;
+        vo.cursor_rect_px = cell_data.cursor_rect_px;
+        float any_block_cursor = cell_data.has_block_cursor + cell_data.has_rounded_block_cursor;
+        foreground = if_one_then(any_block_cursor, final_cursor_text_color, foreground);
+        vo.decoration_fg = if_one_then(any_block_cursor, final_cursor_text_color, vo.decoration_fg);
         vo.cursor_pos = to_sprite_pos(cell_data.pos, cell_data.cursor_fg_sprite_idx * uint(cell_data.has_cursor));
     }
     // }}}
 
-    vo.background = background_rgb;
+    // the text in a rounded block cursor is drawn over the cursor color, not the cell background
+    vo.background = if_one_then(cell_data.has_rounded_block_cursor, lerp(background_rgb, cell_data.cursor.bg, crd.cursor_opacity), background_rgb);
 
     if (!ONLY_BACKGROUND && FG_OVERRIDE_ALGO > 0) {
-        vo.decoration_fg = override_foreground_color(vo.decoration_fg, background_rgb, vo.colored_sprite);
-        foreground = override_foreground_color(foreground, background_rgb, vo.colored_sprite);
+        vo.decoration_fg = override_foreground_color(vo.decoration_fg, vo.background, vo.colored_sprite);
+        foreground = override_foreground_color(foreground, vo.background, vo.colored_sprite);
+        vo.uncursored_foreground = override_foreground_color(vo.uncursored_foreground, background_rgb, vo.colored_sprite);
     }
 
     if (!ONLY_FOREGROUND) {
@@ -292,6 +303,15 @@ adjust_foreground_contrast_with_background(float4 text_fg, float3 bg, float text
     return foreground_contrast(text_fg, bg, text_contrast, text_gamma_adjustment);
 }
 
+float
+rounded_cursor_coverage(float4 cursor_rect_px) {
+    float2 half_size = cursor_rect_px.zw;
+    float radius = min(crd.cursor_corner_radius, min(half_size.x, half_size.y));
+    float2 q = abs(cursor_rect_px.xy) - (half_size - radius);
+    float dist = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    return clamp(0.5 - dist, 0.0, 1.0); // anti-aliased over one pixel
+}
+
 [shader("fragment")]
 float4
 fragment_main(VertexOutput vo, uniform float text_contrast, uniform float text_gamma_adjustment, )
@@ -301,7 +321,9 @@ fragment_main(VertexOutput vo, uniform float text_contrast, uniform float text_g
 
     if (!ONLY_BACKGROUND) {
         // blend in the foreground color
-        float4 text_fg = load_text_foreground_color(vo.sprite_pos, vo.colored_sprite, vo.cell_foreground);
+        float cursor_mask = vo.has_rounded_block_cursor * rounded_cursor_coverage(vo.cursor_rect_px);
+        float3 cell_foreground = if_one_then(vo.has_rounded_block_cursor, lerp(vo.uncursored_foreground, vo.cell_foreground, cursor_mask), vo.cell_foreground);
+        float4 text_fg = load_text_foreground_color(vo.sprite_pos, vo.colored_sprite, cell_foreground);
         text_fg = adjust_foreground_contrast_with_background(text_fg, vo.background, text_contrast, text_gamma_adjustment);
         float4 text_fg_premul = calculate_premul_foreground_from_sprites(
             vo.sprite_pos,
@@ -313,6 +335,8 @@ fragment_main(VertexOutput vo, uniform float text_contrast, uniform float text_g
             vo.decoration_fg,
             vo.cursor_color_premult,
             vo.effective_text_alpha);
+        // The rounded block cursor goes between the text and the background
+        text_fg_premul = alpha_blend_premul(text_fg_premul, vo.cursor_color_premult * cursor_mask);
         if (ONLY_FOREGROUND) ans_premul = text_fg_premul;
         else ans_premul = alpha_blend_premul(text_fg_premul, ans_premul);
     }

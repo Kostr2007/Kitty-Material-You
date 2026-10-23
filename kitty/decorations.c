@@ -212,9 +212,51 @@ horz(uint8_t *ans, bool is_top_edge, double height_pt, double dpi_y, FontCellMet
 }
 
 
+// Material You shapes: anti-aliased rounded rectangles for the cursor {{{
+static double
+rounded_rect_sdf(double px, double py, double cx, double cy, double half_w, double half_h, double radius) {
+    double qx = fabs(px - cx) - (half_w - radius), qy = fabs(py - cy) - (half_h - radius);
+    double ox = fmax(qx, 0.), oy = fmax(qy, 0.);
+    return sqrt(ox * ox + oy * oy) + fmin(fmax(qx, qy), 0.) - radius;
+}
+
+// Coverage of a filled (thickness <= 0) or outlined rounded rect inside the
+// cell, using SUPERSAMPLE_FACTOR^2 samples per pixel
+static void
+add_rounded_rect(uint8_t *buf, FontCellMetrics fcm, double left, double top, double width, double height, double radius, double thickness) {
+    const double half_w = width / 2., half_h = height / 2., cx = left + half_w, cy = top + half_h;
+    radius = fmax(0., fmin(radius, fmin(half_w, half_h)));
+    const double inner_radius = fmax(0., radius - thickness);
+    const unsigned ss = SUPERSAMPLE_FACTOR;
+    for (unsigned y = 0; y < fcm.cell_height; y++) {
+        for (unsigned x = 0; x < fcm.cell_width; x++) {
+            unsigned covered = 0;
+            for (unsigned sy = 0; sy < ss; sy++) {
+                for (unsigned sx = 0; sx < ss; sx++) {
+                    double px = x + (sx + 0.5) / ss, py = y + (sy + 0.5) / ss;
+                    if (rounded_rect_sdf(px, py, cx, cy, half_w, half_h, radius) > 0) continue;
+                    if (thickness > 0 && rounded_rect_sdf(px, py, cx, cy, half_w - thickness, half_h - thickness, inner_radius) <= 0) continue;
+                    covered++;
+                }
+            }
+            if (covered) buf[y * fcm.cell_width + x] = (uint8_t)MIN(255u, buf[y * fcm.cell_width + x] + (255u * covered) / (ss * ss));
+        }
+    }
+}
+
+static double
+cursor_corner_radius_px(FontCellMetrics fcm) {
+    return OPT(cursor_corner_radius) * fcm.cell_width;
+}
+// }}}
+
 DecorationGeometry
 add_beam_cursor(uint8_t *buf, FontCellMetrics fcm, double dpi_x) {
-    vert(buf, true, OPT(cursor_beam_thickness), dpi_x, fcm);
+    if (cursor_corner_radius_px(fcm) > 0) {
+        // a capsule
+        double width = fmax(1., fmin(OPT(cursor_beam_thickness) * dpi_x / 72.0, fcm.cell_width));
+        add_rounded_rect(buf, fcm, 0, 0, width, fcm.cell_height, width / 2., 0);
+    } else vert(buf, true, OPT(cursor_beam_thickness), dpi_x, fcm);
     DecorationGeometry ans = {.height = fcm.cell_height};
     return ans;
 }
@@ -222,17 +264,27 @@ add_beam_cursor(uint8_t *buf, FontCellMetrics fcm, double dpi_x) {
 DecorationGeometry
 add_underline_cursor(uint8_t *buf, FontCellMetrics fcm, double dpi_y) {
     DecorationGeometry ans = {0};
-    ans.top = horz(buf, false, OPT(cursor_underline_thickness), dpi_y, fcm);
+    if (cursor_corner_radius_px(fcm) > 0) {
+        double height = fmax(1., fmin(OPT(cursor_underline_thickness) * dpi_y / 72.0, fcm.cell_height));
+        add_rounded_rect(buf, fcm, 0, fcm.cell_height - height, fcm.cell_width, height, height / 2., 0);
+        ans.top = (uint32_t)floor(fcm.cell_height - height);
+    } else ans.top = horz(buf, false, OPT(cursor_underline_thickness), dpi_y, fcm);
     ans.height = fcm.cell_height - ans.top;
     return ans;
 }
 
 DecorationGeometry
 add_hollow_cursor(uint8_t *buf, FontCellMetrics fcm, double dpi_x, double dpi_y) {
-    vert(buf, true, 1.0, dpi_x, fcm);
-    vert(buf, false, 1.0, dpi_x, fcm);
-    horz(buf, true, 1.0, dpi_y, fcm);
-    horz(buf, false, 1.0, dpi_y, fcm);
+    const double radius = cursor_corner_radius_px(fcm);
+    if (radius > 0) {
+        double thickness = fmax(1., fmin(dpi_x, dpi_y) / 72.0);
+        add_rounded_rect(buf, fcm, 0, 0, fcm.cell_width, fcm.cell_height, radius, thickness);
+    } else {
+        vert(buf, true, 1.0, dpi_x, fcm);
+        vert(buf, false, 1.0, dpi_x, fcm);
+        horz(buf, true, 1.0, dpi_y, fcm);
+        horz(buf, false, 1.0, dpi_y, fcm);
+    }
     DecorationGeometry ans = {.height = fcm.cell_height};
     return ans;
 }

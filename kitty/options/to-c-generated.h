@@ -187,6 +187,19 @@ convert_from_opts_cursor_underline_thickness(PyObject *py_opts, Options *opts) {
 }
 
 static void
+convert_from_python_cursor_corner_radius(PyObject *val, Options *opts) {
+    opts->cursor_corner_radius = PyFloat_AsFloat(val);
+}
+
+static void
+convert_from_opts_cursor_corner_radius(PyObject *py_opts, Options *opts) {
+    PyObject *ret = PyObject_GetAttrString(py_opts, "cursor_corner_radius");
+    if (ret == NULL) return;
+    convert_from_python_cursor_corner_radius(ret, opts);
+    Py_DECREF(ret);
+}
+
+static void
 convert_from_python_cursor_blink_interval(PyObject *val, Options *opts) {
     cursor_blink_interval(val, opts);
 }
@@ -1619,6 +1632,8 @@ convert_opts_from_python_opts(PyObject *py_opts, Options *opts) {
     convert_from_opts_cursor_beam_thickness(py_opts, opts);
     if (PyErr_Occurred()) return false;
     convert_from_opts_cursor_underline_thickness(py_opts, opts);
+    if (PyErr_Occurred()) return false;
+    convert_from_opts_cursor_corner_radius(py_opts, opts);
     if (PyErr_Occurred()) return false;
     convert_from_opts_cursor_blink_interval(py_opts, opts);
     if (PyErr_Occurred()) return false;

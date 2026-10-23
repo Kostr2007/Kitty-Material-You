@@ -340,6 +340,7 @@ option_names = (
     'cursor',
     'cursor_beam_thickness',
     'cursor_blink_interval',
+    'cursor_corner_radius',
     'cursor_shape',
     'cursor_shape_unfocused',
     'cursor_stop_blinking_after',
@@ -569,6 +570,7 @@ class Options:
     cursor: kitty.fast_data_types.Color | None = Color(204, 204, 204)
     cursor_beam_thickness: float = 1.5
     cursor_blink_interval: tuple[float, kitty.options.utils.EasingFunction, kitty.options.utils.EasingFunction] = (-1.0, kitty.options.utils.EasingFunction(), kitty.options.utils.EasingFunction())
+    cursor_corner_radius: float = 0.0
     cursor_shape: int = 1
     cursor_shape_unfocused: int = 4
     cursor_stop_blinking_after: float = 15.0

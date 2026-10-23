@@ -35,6 +35,8 @@ public struct CellRenderData {
     public uint columns, lines, sprites_xnum, sprites_ynum, cursor_shape, cell_width, cell_height;
     public uint cursor_x1, cursor_x2, cursor_y1, cursor_y2;
     public float cursor_opacity, inactive_text_alpha, fg_override_threshold, row_offset, dim_opacity, blink_opacity;
+    // corner radius in pixels of the block cursor, zero for a square cursor
+    public float cursor_corner_radius;
 
     // must have unique entries with 0 being default_bg and unset being UINT32_MAX
     public uint bg_colors0, bg_colors1, bg_colors2, bg_colors3, bg_colors4, bg_colors5, bg_colors6, bg_colors7;
@@ -217,7 +219,11 @@ calc_background_opacity(uint bg) {
 
 public struct CellData {
     public float has_cursor;
-    public float has_block_cursor;
+    public float has_block_cursor; // a square block cursor, rendered as the cell background
+    // a block cursor with rounded corners, rendered under the text in the foreground pass
+    public float has_rounded_block_cursor;
+    // position of this vertex relative to the center of the cursor and the half size of the cursor, in pixels
+    public float4 cursor_rect_px;
     public uint2 pos;
     public uint cursor_fg_sprite_idx;
     public ColorPair cursor;
@@ -290,7 +296,16 @@ compute_background(uint3 colors, uint2 sprite_idx, uint is_selected, uint instan
 
     float final_cursor_shape = if_one_then(has_main_cursor, crd.cursor_shape, multicursor_shape);
     float has_cursor = zero_or_one(final_cursor_shape);
-    float is_block_cursor = has_cursor * one_if_equal_zero_otherwise(final_cursor_shape, 1.0);
+    float is_any_block_cursor = has_cursor * one_if_equal_zero_otherwise(final_cursor_shape, 1.0);
+    float rounded_cursor = step(0.5, crd.cursor_corner_radius);
+    float is_block_cursor = is_any_block_cursor * (1.0 - rounded_cursor);
+    // The main cursor can span multiple cells for multicell text, extra cursors are single cell
+    float2 cursor_cells =
+        if_one_then(has_main_cursor, float2(float(crd.cursor_x2 - crd.cursor_x1 + 1u), float(crd.cursor_y2 - crd.cursor_y1 + 1u)), float2(1.0));
+    float2 cursor_origin = if_one_then(has_main_cursor, float2(float(crd.cursor_x1), float(crd.cursor_y1)), float2(float(column), float(row)));
+    float2 cell_px = float2(float(crd.cell_width), float(crd.cell_height));
+    float2 cursor_half_px = cursor_cells * cell_px * 0.5;
+    float2 vertex_px = (float2(float(column), float(row)) - cursor_origin + float2(pos)) * cell_px - cursor_half_px;
 
     ColorPair main_cursor;
     main_cursor.bg = crd.main_cursor_bg_lin.rgb;
@@ -302,6 +317,8 @@ compute_background(uint3 colors, uint2 sprite_idx, uint is_selected, uint instan
     CellData cell_data;
     cell_data.has_cursor = has_cursor;
     cell_data.has_block_cursor = is_block_cursor;
+    cell_data.has_rounded_block_cursor = is_any_block_cursor * rounded_cursor;
+    cell_data.cursor_rect_px = float4(vertex_px, cursor_half_px);
     cell_data.pos = pos;
     cell_data.cursor_fg_sprite_idx = cursor_shape_map[int(final_cursor_shape)];
     cell_data.cursor = cursor;

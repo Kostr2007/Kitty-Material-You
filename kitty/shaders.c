@@ -860,6 +860,7 @@ cell_update_uniform_block(
         GLuint columns, lines, sprites_xnum, sprites_ynum, cursor_shape, cell_width, cell_height;
         GLuint cursor_x1, cursor_x2, cursor_y1, cursor_y2;
         GLfloat cursor_opacity, inactive_text_alpha, fg_override_threshold, row_offset, dim_opacity, blink_opacity;
+        GLfloat cursor_corner_radius;
 
         GLuint bg_colors0, bg_colors1, bg_colors2, bg_colors3, bg_colors4, bg_colors5, bg_colors6, bg_colors7;
         GLfloat bg_opacities0, bg_opacities1, bg_opacities2, bg_opacities3, bg_opacities4, bg_opacities5, bg_opacities6, bg_opacities7;
@@ -924,6 +925,7 @@ cell_update_uniform_block(
     // Cursor position
     Line *line_for_cursor = NULL;
     rd->cursor_opacity = MAX(0, MIN(cursor->cursor_opacity, 1));
+    rd->cursor_corner_radius = OPT(cursor_corner_radius) * screen->cell_size.width;
     rd->blink_opacity = MAX(0, MIN(cursor->text_blink_opacity, 1));
     // The extra cursors inherit the colors of the main cursor and, optionally,
     // its shape, so the main cursor render data must be computed even when the

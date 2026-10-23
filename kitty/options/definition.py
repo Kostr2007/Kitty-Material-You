@@ -411,6 +411,20 @@ opt('cursor_beam_thickness', '1.5', option_type='positive_float', ctype='float',
 opt('cursor_underline_thickness', '2.0', option_type='positive_float', ctype='float', long_text='The thickness of the underline cursor (in pts).')
 
 opt(
+    'cursor_corner_radius',
+    '0',
+    option_type='cursor_corner_radius',
+    ctype='float',
+    long_text="""
+Give the cursor Material You shapes: the radius of the corners of the block and
+hollow (unfocused) cursors, in units of the cell width. :code:`0.5` makes a
+block cursor a pill, :code:`0.2` gives softly rounded corners. Any non-zero
+value also gives the beam and underline cursors rounded, anti-aliased ends.
+Zero disables rounding.
+""",
+)
+
+opt(
     'cursor_blink_interval',
     '-1',
     option_type='cursor_blink_interval',

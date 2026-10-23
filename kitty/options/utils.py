@@ -670,6 +670,10 @@ def cursor_trail_decay(x: str) -> tuple[float, float]:
     return fast, slow
 
 
+def cursor_corner_radius(x: str) -> float:
+    return max(0.0, min(float(x), 0.5))
+
+
 def cursor_trail_spring(x: str) -> tuple[float, float]:
     x = x.strip().lower()
     if x in ('none', '0', ''):
