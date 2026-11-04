@@ -73,10 +73,14 @@ def main():
         recorder = None
         try:
             time.sleep(1)
+            terminal_env = os.environ.copy()
+            terminal_env["LIBGL_DRIVERS_PATH"] = str(ROOT / "result-mesa/lib/dri")
+            terminal_env["LD_LIBRARY_PATH"] = f"{ROOT}/result-gl/lib:{ROOT}/result-mesa/lib"
+            terminal_env["__GLX_VENDOR_LIBRARY_NAME"] = "mesa"
             terminal = subprocess.Popen([
                 str(kitty), "--config", str(config), "--session", str(session),
                 "--listen-on", f"unix:{socket}", "--start-as", "fullscreen",
-            ])
+            ], env=terminal_env)
             deadline = time.monotonic() + 30
             while not socket.exists():
                 if terminal.poll() is not None:

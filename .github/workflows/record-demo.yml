@@ -29,10 +29,10 @@ jobs:
         run: |
           nix build .#kitty-material-you-no-tests --out-link result-demo
           nix build --impure --expr '(builtins.getFlake (toString ./.)).inputs.nixpkgs.legacyPackages.x86_64-linux.mesa.drivers' --out-link result-mesa
+          nix build --impure --expr '(builtins.getFlake (toString ./.)).inputs.nixpkgs.legacyPackages.x86_64-linux.libglvnd' --out-link result-gl
       - name: Record real Kitty on a virtual screen
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
-          LIBGL_DRIVERS_PATH: ${{ github.workspace }}/result-mesa/lib/dri
         run: xvfb-run -a -s "-screen 0 1000x620x24 +extension GLX" python3 docs/material-you/record-demo.py
       - uses: actions/upload-artifact@v4
         with:
