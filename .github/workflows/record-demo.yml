@@ -56,7 +56,7 @@ jobs:
                   "вкладки-таблетки и плавный переход между тёмной и светлой палитрами.\n\n"
                   "![Демонстрация Kitty Material You](docs/material-you/demo.gif)\n\n"
                   "[Видео MP4](docs/material-you/demo.mp4) · "
-                  "[Повторить запись в облаке](../../actions/workflows/record-demo.yml)\n\n"
+                  "[Повторить запись в облаке](https://github.com/Kostr2007/Kitty-Material-You/actions/workflows/record-demo.yml)\n\n"
               )
               p.write_text(text[:index] + demo + text[index:])
           PY

@@ -17,7 +17,7 @@ Material shaders. Ships as a Nix flake and integrates with Material-You-Terminal
 
 ![Демонстрация Kitty Material You](docs/material-you/demo.gif)
 
-[Видео MP4](docs/material-you/demo.mp4) · [Повторить запись в облаке](../../actions/workflows/record-demo.yml)
+[Видео MP4](docs/material-you/demo.mp4) · [Повторить запись в облаке](https://github.com/Kostr2007/Kitty-Material-You/actions/workflows/record-demo.yml)
 
 ![Тёмная тема: вкладки-таблетки, окна-карточки, «желейный» след курсора](docs/material-you/dark.png)
 
