@@ -36,6 +36,18 @@
     color_transition = "0.5 m3-spring-effects";
   };
 
+  # Density changes the chrome, never the terminal grid or the user's font.
+  density = {
+    compact = { window_margin_width = "1"; tab_bar_margin_width = "4"; tab_bar_margin_height = "2 2"; };
+    comfortable = { window_margin_width = "3"; tab_bar_margin_width = "6"; tab_bar_margin_height = "6 4"; };
+    spacious = { window_margin_width = "6"; tab_bar_margin_width = "12"; tab_bar_margin_height = "10 6"; };
+  };
+
+  motionSchemes = {
+    expressive = { cursor_trail_spring = "m3-expressive-fast"; };
+    standard = { cursor_trail_spring = "m3-spring-fast"; };
+  };
+
   shaders = {
     # Jelly cursor trail, touch ripples and a springy focus indicator
     custom_shaders = "material-you";

@@ -371,6 +371,25 @@ def conf_parsing(self):
                 if action.func == name:
                     yield key
 
+    for lines in (
+        (
+            'reduced_motion yes',
+            'cursor_trail 1',
+            'custom_shaders material-you',
+            'color_transition 0.5',
+            'visual_bell_duration 0.3',
+            'cursor_blink_interval 0.6',
+        ),
+        ('cursor_trail 1', 'custom_shaders material-you', 'color_transition 0.5', 'reduced_motion yes'),
+    ):
+        still = p(*lines)
+        self.ae(still.cursor_trail, 0)
+        self.ae(still.cursor_blink_interval[0], 0)
+        self.ae(still.visual_bell_duration[0], 0)
+        self.ae(still.color_transition[0], 0)
+        self.ae(still.custom_shaders, ())
+    self.ae(p('reduced_motion no', 'custom_shaders material-you').custom_shaders, ('material-you',))
+
     opts = p('font_size 11.37', 'clear_all_shortcuts y', 'color23 red')
     self.ae(opts.font_size, 11.37)
     radius_opts = p('window_border_radius 7px')

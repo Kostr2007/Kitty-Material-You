@@ -3,17 +3,17 @@ Run under Xvfb after building result-demo; requires ffmpeg and openbox.
 The --scene mode runs inside Kitty and only writes terminal escape sequences.
 """
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "docs/material-you"
 
-def scene():
-    def write(s):
+def scene() -> None:
+    def write(s: str) -> None:
         sys.stdout.write(s)
         sys.stdout.flush()
     write("\033[2J\033[H\033[?25l")
@@ -45,7 +45,7 @@ def scene():
             write(f"\033[{row};{col}H")
             time.sleep(0.55)
 
-def main():
+def main() -> None:
     kitty = ROOT / "result-demo/bin/kitty"
     if not kitty.exists():
         raise SystemExit("Build first: nix build .#kitty-material-you-no-tests --out-link result-demo")

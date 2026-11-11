@@ -9,6 +9,7 @@
 from collections.abc import Callable, Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Optional
 
+from .color_contrast import TEXT_PAIRS, reverses_polarity
 from .fast_data_types import add_timer, evaluate_easing_function, get_options, monotonic, remove_timer
 from .options.types import special_colors
 from .options.utils import EasingFunction
@@ -91,7 +92,7 @@ class ColorTransition:
             return 1
         if not self.easing:
             return t
-        return evaluate_easing_function(self.easing, t, self.duration)
+        return max(0.0, min(1.0, evaluate_easing_function(self.easing, t, self.duration)))
 
     def start(self) -> None:
         self.tick()
@@ -174,20 +175,24 @@ def start_color_transition(
     from .colors import patch_colors
 
     target = {k: v for k in keys if isinstance(v := spec[k], int)}
-    gstart = global_start_colors(keys)
+    gstart = global_start_colors((*keys, *(key for pair in TEXT_PAIRS for key in pair)))
     groups: dict[tuple[tuple[str, int], ...], list[WindowType]] = {}
     for w in windows:
         if not w:
             continue
         current: dict[str, Any] = w.current_colors
         start = dict(gstart)
-        for k in keys:
+        for k in gstart.keys() | target.keys():
             if isinstance(current.get(k), int):
                 start[k] = current[k]
-        start = {k: v for k, v in start.items() if v != target[k]}
+        if reverses_polarity(start, target):
+            return False
+        start = {k: v for k, v in start.items() if k in target and v != target[k]}
         groups.setdefault(tuple(sorted(start.items())), []).append(w)
     if not windows:
-        start = {k: v for k, v in gstart.items() if v != target[k]}
+        if reverses_polarity(gstart, target):
+            return False
+        start = {k: v for k, v in gstart.items() if k in target and v != target[k]}
         groups[tuple(sorted(start.items()))] = []
     final_groups = tuple((tuple(ws), dict(start)) for start, ws in groups.items() if start)
     if not final_groups:

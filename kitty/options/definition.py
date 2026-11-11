@@ -2554,6 +2554,20 @@ opt(
 )
 
 opt(
+    'reduced_motion',
+    'no',
+    option_type='to_bool',
+    long_text="""
+Prefer a still interface. Disables cursor trails, cursor blinking, visual bell
+flashes, animated color transitions and custom shader pipelines, regardless of
+where those options occur in the configuration. Static shapes, tab indicators
+and bell/attention symbols remain available. Can be changed by reloading the
+configuration. Desktop integrations can set this from the user's accessibility
+or animation preference; kitty does not automatically query desktop settings.
+""",
+)
+
+opt(
     'color_transition',
     '0',
     option_type='color_transition',
@@ -2567,6 +2581,9 @@ borders transition over the specified number of seconds, interpolated in the
 perceptually uniform OKLab color space. Optionally followed by an
 :term:`easing function`, for example: :code:`0.45 m3-emphasized-decelerate` or
 :code:`0.6 m3-spring-effects`. Zero disables the transition.
+Effects easing is clamped to avoid color overshoot. Changes that reverse the
+light/dark polarity of a text/background pair are applied immediately: blending
+opposing foreground and background colors would pass through unreadable gray.
 """,
 )
 

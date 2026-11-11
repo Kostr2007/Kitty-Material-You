@@ -187,6 +187,13 @@ def load_config(*paths: str, overrides: Iterable[str] | None = None, accumulate_
     )
     opts = Options(opts_dict)
 
+    if opts.reduced_motion:
+        opts.cursor_trail = 0
+        opts.cursor_blink_interval = (0, *opts.cursor_blink_interval[1:])
+        opts.visual_bell_duration = (0, *opts.visual_bell_duration[1:])
+        opts.color_transition = (0, *opts.color_transition[1:])
+        opts.custom_shaders = ()
+
     opts.alias_map = build_action_aliases(opts.kitten_alias, 'kitten')
     opts.alias_map.update(build_action_aliases(opts.action_alias))
     finalize_keys(opts, accumulate_bad_lines)

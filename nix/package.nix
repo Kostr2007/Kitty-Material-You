@@ -47,7 +47,7 @@
   shader-slang,
   src,
   version,
-  myVersion ? "1",
+  myVersion ? "2",
 }:
 
 with python3Packages;

@@ -71,3 +71,48 @@ class TestColorTransition(BaseTest):
         ct = ColorTransition((((), {'background': 0}),), {'background': 1}, 1, EasingFunction(), lambda *a: None, finished.append)
         ct.stop(apply_final=True, except_keys=frozenset({'background'}))
         self.ae(finished, [frozenset({'background'})])
+
+    def test_color_contrast(self):
+        from kitty.color_contrast import contrast_ratio, reverses_polarity
+
+        self.ae(contrast_ratio(0, 0xFFFFFF), 21)
+        self.ae(contrast_ratio(0x6750A4, 0x6750A4), 1)
+        dark = {'foreground': 0xE6E0E9, 'background': 0x141218}
+        light = {'foreground': 0x1D1B20, 'background': 0xFEF7FF}
+        self.assertTrue(reverses_polarity(dark, light))
+        self.assertTrue(reverses_polarity(light, dark))
+        self.assertFalse(reverses_polarity(dark, {'background': 0x211F24}))
+        self.assertTrue(reverses_polarity(dark, {'background': 0xFFFFFF}))
+        self.assertFalse(reverses_polarity({'background': 0}, light))
+        self.assertTrue(
+            reverses_polarity(
+                {'active_tab_foreground': 0xFFFFFF, 'active_tab_background': 0},
+                {'active_tab_foreground': 0, 'active_tab_background': 0xFFFFFF},
+            )
+        )
+
+    def test_color_effects_do_not_overshoot(self):
+        ct = ColorTransition((), {}, 1, EasingFunction.spring('0.6'), lambda *a: None, lambda *a: None)
+        values = [ct.progress(t / 1000) for t in range(1001)]
+        self.assertTrue(all(0 <= t <= 1 for t in values))
+
+    def test_polarity_transition_is_instant(self):
+        from types import SimpleNamespace
+
+        from kitty.color_transition import start_color_transition
+
+        dark = {'foreground': 0xE6E0E9, 'background': 0x141218}
+        light = {'foreground': 0x1D1B20, 'background': 0xFEF7FF}
+        window = SimpleNamespace(current_colors=dark)
+        with (
+            patch('kitty.color_transition.get_options', lambda: SimpleNamespace(color_transition=(0.5, EasingFunction(), None))),
+            patch('kitty.color_transition.global_start_colors', lambda keys: dark),
+            patch('kitty.color_transition.cancel_color_transition'),
+            patch('kitty.color_transition.ColorTransition') as transition,
+        ):
+            self.assertFalse(start_color_transition(light, (), False, [window], False, None))
+            transition.assert_not_called()
+            # Also catch polarity changes when just one member of the pair is sent.
+            self.assertFalse(start_color_transition({'background': 0xFFFFFF}, (), False, [window], False, None))
+            self.assertTrue(start_color_transition({'background': 0x211F24}, (), False, [window], False, None))
+            transition.assert_called_once()

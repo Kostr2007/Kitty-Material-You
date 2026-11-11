@@ -19,7 +19,12 @@ let
     import sys
     from kitty.config import load_config
     bad = []
-    load_config(sys.argv[-1], accumulate_bad_lines=bad)
+    opts = load_config(sys.argv[-1], accumulate_bad_lines=bad)
+    from kitty.fast_data_types import set_options
+    set_options(opts)
+    if opts.reduced_motion:
+        assert opts.cursor_trail == 0 and not opts.custom_shaders
+        assert opts.color_transition[0] == opts.cursor_blink_interval[0] == opts.visual_bell_duration[0] == 0
     for b in bad:
         print('bad line', b.number, repr(b.line), b.exception)
     " "$conf" 2>&1)
@@ -27,6 +32,39 @@ let
       if echo "$res" | grep -qiE "bad line|unknown|error"; then exit 1; fi
     done
   '';
+
+  # Evaluate the public module with a minimal kitty option contract. This checks
+  # merging/priority without requiring a second Home Manager flake input.
+  moduleSettings = args: (lib.evalModules {
+    specialArgs = { inherit pkgs; };
+    modules = [
+      self.homeManagerModules.kitty-material-you
+      {
+        options.programs.kitty = {
+          enable = lib.mkEnableOption "kitty";
+          package = lib.mkOption { type = lib.types.package; };
+          settings = lib.mkOption { type = lib.types.attrsOf lib.types.anything; default = { }; };
+          extraConfig = lib.mkOption { type = lib.types.lines; default = ""; };
+        };
+        config.programs.kitty-material-you = { enable = true; theme = "none"; } // args;
+      }
+    ];
+  }).config.programs.kitty.settings;
+  profiles = lib.cartesianProduct {
+    density = [ "compact" "comfortable" "spacious" ];
+    scheme = [ "standard" "expressive" ];
+    reduced = [ false true ];
+  };
+  profileConfs = map
+    (p:
+      let settings = moduleSettings { inherit (p) density; motion = { inherit (p) scheme reduced; }; };
+      in assert settings.cursor_trail_spring == material.motionSchemes.${p.scheme}.cursor_trail_spring;
+      assert settings.window_margin_width == material.density.${p.density}.window_margin_width;
+      assert settings.reduced_motion == (if p.reduced then "yes" else "no");
+      pkgs.writeText "kitty-profile.conf"
+        (lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "${k} ${v}") settings) + "\n")
+    )
+    profiles;
 
   mytTheme = args: material-you-terminal.lib.mkTheme pkgs args;
 in
@@ -53,6 +91,25 @@ in
       echo "include ${../extras/themes}/material-you-$mode.conf" >> $TMPDIR/$mode.conf
       ${kittyCheck} $TMPDIR/$mode.conf
     done
+    touch $out
+  '';
+
+  profiles = pkgs.runCommandLocal "kitty-material-you-profiles" { } ''
+    export HOME=$TMPDIR
+    ${kittyCheck} ${lib.concatStringsSep " " profileConfs}
+    touch $out
+  '';
+
+  contrast = pkgs.runCommandLocal "kitty-material-you-contrast" { } ''
+    export HOME=$TMPDIR
+    for theme in ${../extras/themes}/material-you-{dark,light}.conf; do
+      ${kitty}/bin/kitty +runpy 'from kitty.color_contrast import main; main()' "$theme"
+    done
+    printf 'foreground #777777\nbackground #777777\n' > $TMPDIR/low-contrast.conf
+    if ${kitty}/bin/kitty +runpy 'from kitty.color_contrast import main; main()' --json $TMPDIR/low-contrast.conf > $TMPDIR/report.json; then
+      echo "audit accepted unreadable text"; exit 1
+    fi
+    ${pkgs.python3}/bin/python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert not r["pass"]' $TMPDIR/report.json
     touch $out
   '';
 

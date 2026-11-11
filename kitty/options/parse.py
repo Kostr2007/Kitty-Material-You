@@ -1255,6 +1255,9 @@ class Parser:
 
     choices_for_progress_bar = frozenset(('left', 'right', 'top', 'bottom', 'hidden'))
 
+    def reduced_motion(self, val: str, ans: dict[str, typing.Any]) -> None:
+        ans['reduced_motion'] = to_bool(val)
+
     def remap_modifiers(self, val: str, ans: dict[str, typing.Any]) -> None:
         ans['remap_modifiers'] = remap_modifiers(val)
 

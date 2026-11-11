@@ -430,6 +430,7 @@ option_names = (
     'pointer_shape_when_dragging',
     'pointer_shape_when_grabbed',
     'progress_bar',
+    'reduced_motion',
     'remap_modifiers',
     'remember_window_position',
     'remember_window_size',
@@ -650,6 +651,7 @@ class Options:
     pointer_shape_when_dragging: tuple[str, str] = ('beam', 'crosshair')
     pointer_shape_when_grabbed: choices_for_pointer_shape_when_grabbed = 'arrow'
     progress_bar: choices_for_progress_bar = 'top'
+    reduced_motion: bool = False
     remap_modifiers: dict[int, int] = {}
     remember_window_position: bool = False
     remember_window_size: bool = True

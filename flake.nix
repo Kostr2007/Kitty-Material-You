@@ -60,6 +60,13 @@
         });
 
       apps = forAllSystems (pkgs: {
+        audit = {
+          type = "app";
+          program = "${pkgs.writeShellScript "kitty-material-you-audit" ''
+            exec ${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/kitty +runpy 'from kitty.color_contrast import main; main()' "$@"
+          ''}";
+          meta.description = "Audit effective kitty theme contrast";
+        };
         # `nix run github:Kostr2007/Kitty-Material-You`
         default = {
           type = "app";

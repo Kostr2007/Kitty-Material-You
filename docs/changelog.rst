@@ -4,6 +4,16 @@ Changelog
 |kitty| is a feature-rich, cross-platform, *fast*, GPU based terminal.
 To update |kitty|, :doc:`follow the instructions <binary>`.
 
+Material You fork: comfort and personalization
+---------------------------------------------
+
+* Add :opt:`reduced_motion` to disable trails, blinking, flashes, palette motion
+  and custom shaders together, including when reloading configuration.
+* Apply palette changes that invert text/surface polarity immediately to avoid
+  unreadable intermediate colors; clamp color effects easing to its endpoints.
+* Add Home Manager chrome density and cursor motion schemes, an effective-theme
+  contrast audit and Nix checks for all density/motion combinations.
+
 .. recent major features {{{
 
 Recent major new features

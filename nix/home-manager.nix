@@ -19,14 +19,19 @@ let
   mkMaterial = mkOverride 900;
 
   settings =
-    lib.optionalAttrs cfg.shapes.enable (material.shapes // {
-      cursor_corner_radius = toString cfg.shapes.cursorCornerRadius;
-      window_border_radius = cfg.shapes.windowCornerRadius;
-    })
-    // lib.optionalAttrs cfg.motion.enable (material.motion // {
-      cursor_trail_spring = cfg.motion.cursorTrailSpring;
+    lib.optionalAttrs cfg.shapes.enable
+      (material.shapes // material.density.${cfg.density} // {
+        cursor_corner_radius = toString cfg.shapes.cursorCornerRadius;
+        window_border_radius = cfg.shapes.windowCornerRadius;
+      })
+    // lib.optionalAttrs cfg.motion.enable (material.motion // material.motionSchemes.${cfg.motion.scheme} // {
+      cursor_trail_spring =
+        if cfg.motion.cursorTrailSpring == null
+        then material.motionSchemes.${cfg.motion.scheme}.cursor_trail_spring
+        else cfg.motion.cursorTrailSpring;
       color_transition = cfg.motion.colorTransition;
     })
+    // { reduced_motion = if cfg.motion.reduced then "yes" else "no"; }
     // lib.optionalAttrs (cfg.shaders != [ ]) {
       custom_shaders = lib.concatStringsSep " " cfg.shaders;
     };
@@ -40,6 +45,12 @@ in
       default = self.packages.${system}.default;
       defaultText = literalExpression "kitty-material-you.packages.\${system}.default";
       description = "The Kitty Material You package, used as `programs.kitty.package`.";
+    };
+
+    density = mkOption {
+      type = types.enum [ "compact" "comfortable" "spacious" ];
+      default = "comfortable";
+      description = "Spacing of window cards and tab chrome; does not change the terminal font or cell grid.";
     };
 
     shapes = {
@@ -69,14 +80,24 @@ in
           and animated color scheme changes.
         '';
       };
+      scheme = mkOption {
+        type = types.enum [ "expressive" "standard" ];
+        default = "expressive";
+        description = "Spatial motion scheme for the cursor trail. Effects use non-overshooting easing in either scheme.";
+      };
+      reduced = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Still interface: disables trails, blinking, visual flashes, palette morphing and all custom shaders.";
+      };
       cursorTrailSpring = mkOption {
-        type = types.str;
-        default = "m3-expressive-fast";
+        type = types.nullOr types.str;
+        default = null;
         example = "700 0.7";
         description = ''
           Spring of the cursor trail: an M3 spring token (`m3-spring-fast`,
           `m3-expressive-default`, ...) or a stiffness and damping ratio.
-          `none` uses kitty's classic exponential trail.
+          `none` uses kitty's classic exponential trail. Null follows motion.scheme.
         '';
       };
       colorTransition = mkOption {
@@ -140,7 +161,7 @@ in
       programs.material-you-terminal = {
         enable = mkDefault true;
         # kitty morphs the colors itself, so myt only has to send the new palette once
-        animations.transitionMs = mkIf (cfg.motion.enable && cfg.motion.colorTransition != "0") (mkDefault 0);
+        animations.transitionMs = mkIf ((cfg.motion.enable && cfg.motion.colorTransition != "0") || cfg.motion.reduced) (mkDefault 0);
       };
     }))
   ]);
